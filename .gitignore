@@ -4,3 +4,7 @@ src-tauri/gen/schemas/
 dist/
 *.log
 .DS_Store
+.playwright-mcp/
+*.png
+!src-tauri/icons/**
+!assets/**

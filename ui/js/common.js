@@ -256,9 +256,6 @@ function cardHtml(view, mode) {
     }
   }
 
-  const ring = mode === 'dash' && worstUsed !== null && style === 'bar'
-    ? ringHtml(worstUsed, 58, `${worstUsed.toFixed(0)}%`, usedStatusCls(worstUsed))
-    : '';
   const cls = worstUsed !== null ? usedStatusCls(worstUsed) : '';
   const updated = mode === 'dash' && snap
     ? `<div class="card-foot">更新于 ${fmtClock(snap.updated_at)}</div>`
@@ -268,7 +265,7 @@ function cardHtml(view, mode) {
     ? `<div class="card-top"><div class="card-main">
          <div class="card-title">${name}${badge}</div>
          ${body}${updated}
-       </div>${ring}</div>`
+       </div></div>`
     : `<div class="card-main">
          <div class="card-title">${name}${badge}</div>
          ${body}
