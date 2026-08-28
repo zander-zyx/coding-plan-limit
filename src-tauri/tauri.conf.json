@@ -1,0 +1,65 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Coding Plan Limit",
+  "version": "0.1.0",
+  "identifier": "com.zander.coding-plan-limit",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "main",
+        "url": "index.html",
+        "title": "Coding Plan Limit",
+        "width": 920,
+        "height": 640,
+        "minWidth": 760,
+        "minHeight": 520,
+        "center": true,
+        "visible": false
+      },
+      {
+        "label": "popup",
+        "url": "popup.html",
+        "width": 344,
+        "height": 480,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "visible": false,
+        "skipTaskbar": true,
+        "alwaysOnTop": true,
+        "resizable": false,
+        "focus": false,
+        "windowEffects": {
+          "effects": ["acrylic", "mica", "hudWindow", "blur"],
+          "state": "active"
+        }
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["SimpChinese"],
+        "displayLanguageSelector": false
+      }
+    }
+  }
+}

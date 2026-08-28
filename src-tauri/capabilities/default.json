@@ -1,0 +1,13 @@
+{
+  "$schema": "gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "默认窗口能力：事件监听、通知、开机自启",
+  "windows": ["main", "popup"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "notification:default",
+    "autostart:default"
+  ]
+}

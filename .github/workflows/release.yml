@@ -1,0 +1,60 @@
+name: Release
+
+# 推送 v* 标签时，在三大平台原生构建并上传安装包
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            targets: ['x86_64-pc-windows-msvc']      # → .exe (NSIS)
+          - os: macos-latest
+            targets: ['aarch64-apple-darwin']        # → Apple Silicon .dmg
+          - os: macos-latest
+            targets: ['x86_64-apple-darwin']         # → Intel .dmg
+          - os: ubuntu-22.04
+            targets: ['x86_64-unknown-linux-gnu']    # → .AppImage / .deb
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ join(matrix.targets, ' ') }}
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev patchelf libsecret-1-0 libsecret-1-dev
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install frontend deps
+        run: npm install --no-fund --no-audit
+
+      - name: Build (tauri-action)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Coding Plan Limit ${{ github.ref_name }}'
+          releaseBody: '跨平台安装包：Windows (.exe) / macOS (.dmg) / Linux (.AppImage, .deb)'
+          releaseDraft: false
+          prerelease: false
