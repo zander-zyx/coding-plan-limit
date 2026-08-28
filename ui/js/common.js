@@ -1,26 +1,27 @@
 // ============================================================
-// Coding Plan Limit — 前端共享库（无框架，依赖 Tauri withGlobalTauri）
-// 所有百分比统一展示"已使用"；进度样式 bar（平滑填充，默认）/ ring（环形）
+// Plan Limit — 共享渲染层
+// 设计规范：字号 11/13/15，字重 400/500/600，过渡 180ms
+// 配色：--brand-hue 派生体系（applyAccent 把用户选色转成 Hue）
 // ============================================================
 
 const Tauri = window.__TAURI__;
 const invoke = Tauri.core.invoke;
 const listen = Tauri.event.listen;
 
-// ─── 模板元数据（name/color/icon/homepage 与后端 templates() 对应） ──
+// ─── 模板元数据 ────────────────────────────────────────────────
 const PROVIDER_META = {
-  minimax:        { name: 'MiniMax',       color: '#ff5b4a', icon: 'icons/minimax.svg', homepage: 'https://platform.minimaxi.com' },
-  zhipu:          { name: '智谱 GLM',      color: '#3f7cff', icon: 'icons/zhipu.svg', homepage: 'https://open.bigmodel.cn' },
-  'kimi-coding':  { name: 'Kimi Coding',   color: '#16c8b7', icon: 'icons/kimi.svg', homepage: 'https://www.kimi.com/coding' },
-  'claude-official': { name: 'Claude',     color: '#d97757', icon: 'icons/claude-official.svg', homepage: 'https://claude.ai' },
-  codex:          { name: 'Codex',         color: '#10a37f', icon: 'icons/codex.svg', homepage: 'https://chatgpt.com' },
+  minimax:        { name: 'MiniMax',       color: '#ff5b4a', icon: 'icons/minimax.png', homepage: 'https://platform.minimaxi.com' },
+  zhipu:          { name: '智谱 GLM',      color: '#3f7cff', icon: 'icons/zhipu.png', homepage: 'https://open.bigmodel.cn' },
+  'kimi-coding':  { name: 'Kimi Coding',   color: '#16c8b7', icon: 'icons/kimi.png', homepage: 'https://www.kimi.com/coding' },
+  'claude-official': { name: 'Claude',     color: '#d97757', icon: 'icons/claude-official.png', homepage: 'https://claude.ai' },
+  codex:          { name: 'Codex',         color: '#10a37f', icon: 'icons/codex.png', homepage: 'https://chatgpt.com' },
   'claude-cache': { name: 'Claude',        color: '#d97757', icon: 'icons/claude-cache.svg', homepage: 'https://claude.ai' },
-  xiaomi:         { name: '小米 MiMo',     color: '#ff6900', icon: 'icons/xiaomi.svg', homepage: 'https://platform.xiaomimimo.com' },
-  deepseek:       { name: 'DeepSeek',      color: '#4d6bfe', icon: 'icons/deepseek.svg', homepage: 'https://platform.deepseek.com' },
-  kimi:           { name: 'Kimi',          color: '#0ea5a3', icon: 'icons/kimi.svg', homepage: 'https://platform.moonshot.cn' },
-  stepfun:        { name: '阶跃星辰',      color: '#8b5cf6', icon: 'icons/stepfun.svg', homepage: 'https://platform.stepfun.com' },
-  siliconflow:    { name: '硅基流动',      color: '#6366f1', icon: 'icons/siliconflow.svg', homepage: 'https://cloud.siliconflow.cn' },
-  alibaba:        { name: '阿里云',        color: '#f59e0b', icon: 'icons/alibaba.svg', homepage: 'https://bailian.console.aliyun.com' },
+  xiaomi:         { name: '小米 MiMo',     color: '#ff6900', icon: 'icons/xiaomi.ico', homepage: 'https://platform.xiaomimimo.com' },
+  deepseek:       { name: 'DeepSeek',      color: '#4d6bfe', icon: 'icons/deepseek.ico', homepage: 'https://platform.deepseek.com' },
+  kimi:           { name: 'Kimi',          color: '#0ea5a3', icon: 'icons/kimi.png', homepage: 'https://platform.moonshot.cn' },
+  stepfun:        { name: '阶跃星辰',      color: '#8b5cf6', icon: 'icons/stepfun.png', homepage: 'https://platform.stepfun.com' },
+  siliconflow:    { name: '硅基流动',      color: '#6366f1', icon: 'icons/siliconflow.png', homepage: 'https://cloud.siliconflow.cn' },
+  alibaba:        { name: '阿里云',        color: '#f59e0b', icon: 'icons/alibaba.png', homepage: 'https://bailian.console.aliyun.com' },
   packycode:      { name: 'PackyCode',     color: '#7c5cff', icon: 'icons/packycode.svg', homepage: 'https://www.packyapi.ai' },
   newapi:         { name: 'NewAPI',        color: '#38bdf8', icon: '', homepage: '' },
   sub2api:        { name: 'Sub2API',       color: '#94a3b8', icon: '', homepage: '' },
@@ -40,22 +41,33 @@ _systemDark.addEventListener('change', () => {
   }
 });
 
-/** 应用自定义主题色（#RRGGBB），并按亮度决定高亮文字用深/浅 */
-function applyAccent(hex) {
-  if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return;
-  const root = document.documentElement;
-  root.style.setProperty('--accent', hex);
+/** Kimi 规范：Hue 落在 260–280° 时吸附到官方 Kimi 紫 #7c5cff（hue≈257） */
+function hexToHue(hex) {
   const n = parseInt(hex.slice(1), 16);
-  const lum = 0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 0xff) + 0.0722 * (n & 0xff);
-  root.style.setProperty('--accent-contrast', lum > 165 ? '#1d2231' : '#ffffff');
+  const r = ((n >> 16) & 0xff) / 255, g = ((n >> 8) & 0xff) / 255, b = (n & 0xff) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  if (max === min) return 257;
+  const d = max - min;
+  let h;
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) h = ((b - r) / d + 2) / 6;
+  else h = ((r - g) / d + 4) / 6;
+  const deg = Math.round(h * 360);
+  return deg >= 260 && deg <= 280 ? 257 : deg;
 }
 
-/** 把设置对象落到全局外观状态（主题 / 主题色 / 进度样式） */
+/** 用户选色 → 提取 Hue 写入 --brand-hue，全站配色自动派生 */
+function applyAccent(hex) {
+  if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+  document.documentElement.style.setProperty('--brand-hue', String(hexToHue(hex)));
+}
+
 function applySettingsLook(s) {
   if (!s) return;
   window.__themePref = s.theme || 'system';
   applyTheme(window.__themePref);
-  applyAccent(s.accent);
+  if (s.accent) applyAccent(s.accent);
+  else document.documentElement.style.setProperty('--brand-hue', '262');
   window.__barStyle = s.bar_style === 'ring' ? 'ring' : 'bar';
 }
 
@@ -64,7 +76,6 @@ async function initTheme() {
     applySettingsLook(await invoke('get_settings'));
   } catch {
     window.__themePref = 'system';
-    window.__barStyle = 'bar';
   }
   applyTheme(window.__themePref);
 }
@@ -76,77 +87,47 @@ function esc(s) {
   }[c]));
 }
 
+/** 相对时间："刚刚 / 5 分钟前 / 2 小时前" */
+function fmtAgo(unixSecs) {
+  if (!unixSecs) return '—';
+  const diff = Math.floor(Date.now() / 1000) - unixSecs;
+  if (diff < 60) return '刚刚';
+  if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
+  return `${Math.floor(diff / 86400)} 天前`;
+}
+
+/** 紧凑重置倒计时："1.4 小时后" / "25 分后" */
+function countdownCompact(unixSecs) {
+  if (!unixSecs) return '';
+  const diff = unixSecs - Date.now() / 1000;
+  if (diff <= 0) return '即将重置';
+  const h = diff / 3600;
+  if (h >= 1) return `${h.toFixed(1)} 小时后`;
+  return `${Math.max(1, Math.round(diff / 60))} 分后`;
+}
+
 function fmtClock(unixSecs) {
   if (!unixSecs) return '—';
   return new Date(unixSecs * 1000).toLocaleTimeString('zh-CN', { hour12: false });
 }
 
-function fmtCountdown(unixSecs) {
-  if (!unixSecs) return '';
-  const diff = unixSecs - Date.now() / 1000;
-  if (diff <= 0) return '即将重置';
-  const h = Math.floor(diff / 3600);
-  const m = Math.floor((diff % 3600) / 60);
-  return h > 0 ? `${h}小时${m}分后重置` : `${Math.max(m, 1)}分钟后重置`;
-}
-
-/** 大数字缩写：12345 → 1.2万 */
 function fmtNum(n) {
   if (n >= 1e8) return (n / 1e8).toFixed(1) + '亿';
   if (n >= 1e4) return (n / 1e4).toFixed(1) + '万';
   return String(Math.round(n));
 }
 
-/** 已用百分比 → 状态类名（颜色随用量升高变黄变红） */
-function usedStatusCls(usedPct) {
-  if (usedPct >= 90) return 'st-bad';
-  if (usedPct >= 75) return 'st-warn';
-  return 'st-ok';
+/** 规范：Critical = 剩余 <10%（即已用 ≥90%）→ 暖琥珀 */
+function isUrgent(usedPct) {
+  return usedPct >= 90;
 }
 
-// ─── SVG 环形 ─────────────────────────────────────────────────
-const RING_R = 19;
-const RING_C = 2 * Math.PI * RING_R;
-
-/**
- * 环形（已用百分比），从 0 平滑过渡到目标值
- * @param cls 状态类（st-ok/st-warn/st-bad）控制颜色
- */
-function ringHtml(usedPct, size, label, cls) {
-  const frac = Math.min(Math.max(usedPct, 0), 100) / 100;
-  const offset = (RING_C * (1 - frac)).toFixed(2);
-  return `
-  <div class="ring-wrap ${cls}" style="width:${size}px;height:${size}px">
-    <svg class="ring" width="${size}" height="${size}" viewBox="0 0 44 44">
-      <circle class="ring-bg" cx="22" cy="22" r="${RING_R}"/>
-      <circle class="ring-fg" cx="22" cy="22" r="${RING_R}"
-        stroke-dasharray="${RING_C.toFixed(2)}" stroke-dashoffset="${RING_C.toFixed(2)}"
-        data-target="${offset}"/>
-    </svg>
-    <span class="ring-label" style="font-size:${size >= 56 ? 11.5 : 10}px">${esc(label)}</span>
-  </div>`;
-}
-
-/** 渲染后触发环形/进度条从 0 → 目标值的平滑动画 */
-function animateCards(container) {
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    container.querySelectorAll('.ring-fg[data-target]').forEach((el) => {
-      el.style.strokeDashoffset = el.dataset.target;
-      el.removeAttribute('data-target');
-    });
-    container.querySelectorAll('.bar > i[data-w]').forEach((el) => {
-      el.style.width = el.dataset.w + '%';
-      el.removeAttribute('data-w');
-    });
-  }));
-}
-
-// ─── 卡片片段 ─────────────────────────────────────────────────
+// ─── Logo ─────────────────────────────────────────────────────
 function metaOf(view) {
   return PROVIDER_META[view.plan.template] || { name: view.plan.template, color: '#8b93a7', icon: '', homepage: '' };
 }
 
-/** 套餐 logo：自定义优先，否则用内置品牌图标；都没有则显示品牌色菱形 */
 function logoHtml(view) {
   const m = metaOf(view);
   const src = view.plan.logo || m.icon;
@@ -156,140 +137,104 @@ function logoHtml(view) {
   return `<i class="tpl-glyph" style="background:${m.color}"></i>`;
 }
 
-/** 单窗口块：标签+重置 / 大号已用% / 通栏平滑进度条 */
-function winBlockHtml(w, compact) {
-  const used = w.used_percent;
-  const cls = usedStatusCls(used);
-  const reset = fmtCountdown(w.reset_at);
-  return `
-  <div class="win-block ${cls}">
-    <div class="win-head">
-      <span>${esc(w.label)}</span>
-      ${reset ? `<span class="reset">${esc(reset)}</span>` : ''}
-    </div>
-    <div class="win-pct ${compact ? 'compact' : ''}">
-      <b>${used.toFixed(used < 10 ? 1 : 0)}</b><span class="u">% 已使用</span>
-    </div>
-    <div class="bar ${cls}"><i data-w="${used.toFixed(1)}"></i></div>
-  </div>`;
-}
-
-/** 多窗口紧凑行（统一显示已用%） */
-function winRowsHtml(windows) {
-  const rows = windows.map((w) => {
-    const cls = usedStatusCls(w.used_percent);
-    return `
-    <div class="win-row">
-      <span>${esc(w.label)}</span>
-      <div class="bar slim ${cls}"><i data-w="${w.used_percent.toFixed(1)}"></i></div>
-      <b>${w.used_percent.toFixed(w.used_percent < 10 ? 1 : 0)}%</b>
-    </div>`;
-  }).join('');
-  return `<div class="win-rows">${rows}</div>`;
-}
-
-/** 环形样式：每个窗口一枚环形（已用%） */
-function ringRowHtml(windows, compact) {
-  const items = windows.map((w) => {
-    const cls = usedStatusCls(w.used_percent);
-    const reset = w.reset_at ? `<span class="ring-reset">${esc(fmtCountdown(w.reset_at))}</span>` : '';
-    return `
-    <div class="ring-item">
-      ${ringHtml(w.used_percent, compact ? 50 : 60, `${w.used_percent.toFixed(0)}%`, cls)}
-      <span class="ring-cap">${esc(w.label)}</span>
-      ${reset}
-    </div>`;
-  }).join('');
-  return `<div class="ring-row">${items}</div>`;
-}
-
+// ─── 行渲染（弹窗与主窗口共用） ───────────────────────────────
 /**
- * 渲染单个套餐卡片
- * @param mode 'popup' 弹窗主卡片 | 'mini' 弹窗"更多"区 | 'dash' 仪表盘
+ * 48px 行：图标 + 名称 + 使用率 + 3px 进度条；hover 淡出详情行。
+ * @param opts.sub     "更多"缩进行
+ * @param opts.actions 主窗口行右侧控制区（开关/编辑/删除）
+ * @param opts.main    主窗口模式：附加深色窗口明细行
  */
-function cardHtml(view, mode) {
-  const m = metaOf(view);
-  const name = esc(view.plan.name);
-  const badge = `<span class="tpl-badge" style="color:${m.color}">${esc(m.name)}</span>`;
-  const compact = mode !== 'dash';
-  const style = window.__barStyle || 'bar';
-
-  let body = '';
-  let worstUsed = null;
-
+function rowHtml(view, opts = {}) {
   const snap = view.snapshot;
+  let right = '—';
+  let rightCls = '';
+  let barPct = -1;
+  let tip = '';
+  let urgent = false;
+  let extra = '';
+
   if (!snap || !snap.ok) {
-    const err = snap && snap.error ? String(snap.error) : '尚未获取数据';
-    body = err.startsWith('暂不支持')
-      ? `<div class="notice">ℹ 该套餐暂无窗口额度数据</div>`
-      : `<div class="error">⚠ ${esc(err)}</div>`;
+    tip = snap && snap.error ? String(snap.error) : '尚未获取数据';
+    if (tip.startsWith('暂不支持')) tip = '暂无窗口额度数据';
   } else {
     const q = snap.quota;
     if (q.kind === 'windows') {
       const wins = q.windows;
-      if (mode === 'mini') {
-        body = style === 'ring' ? ringRowHtml(wins, true) : winRowsHtml(wins);
-      } else if (style === 'ring') {
-        body = ringRowHtml(wins, compact);
-      } else {
-        body = winBlockHtml(wins[0], compact);
-        if (wins.length > 1) body += winRowsHtml(wins.slice(1));
+      const worst = wins.reduce((a, w) => Math.max(a, w.used_percent), 0);
+      right = `${worst.toFixed(worst < 10 ? 1 : 0)}%`;
+      barPct = worst;
+      urgent = isUrgent(worst);
+      const resets = wins.map((w) => w.reset_at).filter(Boolean);
+      const next = resets.length ? Math.min(...resets) : null;
+      tip = `${wins.map((w) => w.label).join(' ')}${next ? ` · ${countdownCompact(next)}重置` : ''}`;
+      if (opts.main && wins.length > 1) {
+        extra = wins.slice(1).map((w) => `
+          <div class="mini-win">
+            <span>${esc(w.label)}</span>
+            <div class="bar slim"><i data-w="${w.used_percent.toFixed(1)}"></i></div>
+            <b>${w.used_percent.toFixed(0)}%</b>
+          </div>`).join('');
       }
-      worstUsed = wins.reduce((a, w) => Math.max(a, w.used_percent), 0);
     } else if (q.kind === 'balance') {
-      body = `
-        <div class="big-amount"><small>${esc(q.currency || 'CNY')}</small> ${q.amount.toFixed(2)}</div>
-        ${q.note ? `<div class="card-foot">${esc(q.note)}</div>` : ''}`;
+      right = `${q.currency === 'CNY' ? '¥' : '$'}${q.amount.toFixed(2)}`;
+      tip = q.note || q.currency;
+      if (q.amount <= view.plan.threshold) { urgent = true; rightCls = 'urgent'; }
     } else if (q.kind === 'fixed_quota') {
-      if (mode === 'mini') {
-        body = `<div class="win-rows">
-          <div class="win-row"><span>总额度</span>
-            <div class="bar slim ${usedStatusCls(q.used_percent)}"><i data-w="${q.used_percent.toFixed(1)}"></i></div>
-            <b>${q.used_percent.toFixed(0)}%</b>
-          </div>
-        </div>`;
-      } else if (style === 'ring') {
-        body = ringRowHtml(
-          [{ label: '总额度', used_percent: q.used_percent, reset_at: q.reset_at }],
-          compact,
-        );
-      } else {
-        body = winBlockHtml(
-          { label: '总额度', used_percent: q.used_percent, reset_at: q.reset_at },
-          compact,
-        );
-      }
-      if (mode !== 'mini') {
-        body += `<div class="card-foot">已用 ${fmtNum(q.used)} / 共 ${fmtNum(q.total)} ${esc(q.unit || '')}</div>`;
-      }
-      worstUsed = q.used_percent;
+      right = `${q.used_percent.toFixed(0)}%`;
+      barPct = q.used_percent;
+      urgent = isUrgent(q.used_percent);
+      tip = `已用 ${fmtNum(q.used)} / ${fmtNum(q.total)}`;
     }
   }
+  if (urgent) rightCls = 'urgent';
 
-  const cls = worstUsed !== null ? usedStatusCls(worstUsed) : '';
-  const updated = mode === 'dash' && snap
-    ? `<div class="card-foot">更新于 ${fmtClock(snap.updated_at)}</div>`
+  const bar = barPct >= 0
+    ? `<div class="row-bar"><i data-w="${barPct.toFixed(1)}"></i></div>`
     : '';
+  const tipLine = tip ? `<div class="row-tip">${esc(tip)}</div>` : '';
+  const actions = opts.actions || '';
+  const logo = logoHtml(view);
 
-  const inner = mode === 'dash'
-    ? `<div class="card-top"><div class="card-main">
-         <div class="card-title">${logoHtml(view)}${name}${badge}</div>
-         ${body}${updated}
-       </div></div>`
-    : `<div class="card-main">
-         <div class="card-title">${logoHtml(view)}${name}${badge}</div>
-         ${body}
-       </div>`;
-
-  return `<div class="card ${cls} ${mode === 'dash' ? 'dash-card' : ''}" data-template="${esc(view.plan.template)}">${inner}</div>`;
+  return `
+  <div class="row ${sub_cls(opts)} ${urgent ? 'row-urgent' : ''}" data-template="${esc(view.plan.template)}">
+    <div class="row-main">
+      <div class="row-icon">${logo}</div>
+      <div class="row-body">
+        <div class="row-top">
+          <span class="row-name">${esc(view.plan.name)}${view.plan.enabled ? '' : ' <em class="row-off">已停用</em>'}</span>
+          <span class="row-pct ${rightCls}">${esc(right)}</span>
+        </div>
+        ${bar}${extra}
+      </div>
+      ${actions}
+    </div>
+    ${tipLine}
+  </div>`;
 }
 
-// ─── 弹窗视图拆分：固定展示 ≤max 家，其余收进"更多" ─────────────
+function sub_cls(opts) {
+  return opts.sub ? 'row-sub' : '';
+}
+
+/** 主窗口行右侧控制区（套餐管理） */
+function rowActionsHtml(view) {
+  return `
+  <div class="row-actions">
+    <label class="switch" title="启用/停用">
+      <input type="checkbox" data-toggle="${view.plan.id}" ${view.plan.enabled ? 'checked' : ''} /><i></i>
+    </label>
+    <button class="txt-btn" data-edit="${view.plan.id}">编辑</button>
+    <button class="txt-btn danger" data-del="${view.plan.id}">删除</button>
+  </div>`;
+}
+
+// ─── 弹窗视图拆分：未选择时默认固定 3 家；选了 N 家展示 N 家（≤10） ──
 function splitPopupViews(views, popupPlanIds, max) {
-  const cap = Math.min(Math.max(max || 2, 1), 10);
+  const ids = popupPlanIds || [];
+  const cap = ids.length ? Math.min(Math.max(ids.length, 1), 10) : Math.min(Math.max(max || 3, 1), 3);
   const enabled = views.filter((v) => v.plan.enabled);
   const byId = new Map(enabled.map((v) => [v.plan.id, v]));
-  const picked = (popupPlanIds || [])
+  const picked = ids
     .map((id) => byId.get(id))
     .filter(Boolean)
     .slice(0, cap);
@@ -301,7 +246,7 @@ function splitPopupViews(views, popupPlanIds, max) {
   return { primary: picked, rest };
 }
 
-// ─── Toast ────────────────────────────────────────────────────
+// ─── Toast（仅错误提示；规范禁止成功提示） ────────────────────
 let _toastTimer = null;
 function toast(msg, warn) {
   let el = document.getElementById('toast');
@@ -311,7 +256,6 @@ function toast(msg, warn) {
     document.body.appendChild(el);
   }
   el.textContent = msg;
-  el.classList.toggle('warn', !!warn);
   el.classList.add('show');
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => el.classList.remove('show'), 3200);

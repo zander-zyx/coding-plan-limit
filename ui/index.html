@@ -3,46 +3,35 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Coding Plan Limit</title>
+  <title>Plan Limit</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-  <!-- 有新版本时右上角悬浮更新按钮 -->
-  <button id="btn-update-float" class="update-float" title="发现新版本，点击前往下载" hidden>
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 19h16"/></svg>
-    <i class="update-pulse"></i>
-  </button>
   <div class="app">
     <aside class="side">
-      <div class="logo" id="logo">◐ Coding Plan Limit</div>
+      <div class="logo" id="logo">
+        <span class="brand-dot" id="logo-dot"></span>
+        <span class="logo-text">Plan Limit</span>
+        <button id="btn-update-side" class="update-side" title="发现新版本，点击前往下载" hidden>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 19h16"/></svg>
+          <i class="side-pulse"></i>
+        </button>
+      </div>
       <nav>
-        <button data-view="dash" class="active">仪表盘</button>
-        <button data-view="plans">套餐管理</button>
+        <button data-view="plans" class="active">套餐</button>
         <button data-view="settings">设置</button>
+        <button data-view="about">关于</button>
       </nav>
-      <div class="side-foot">v0.2.0<br />所有数据仅保存在本地</div>
+      <div class="side-foot">v<span id="side-version"></span><br />数据仅存本地</div>
     </aside>
 
     <main class="content">
-      <!-- 仪表盘 -->
-      <section id="view-dash">
+      <!-- 套餐 -->
+      <section id="view-plans">
         <div class="view-head">
           <div>
-            <h1>仪表盘</h1>
-            <div class="sub" id="dash-sub">—</div>
-          </div>
-          <button id="btn-refresh" class="btn ghost">⟳ 全部刷新</button>
-        </div>
-        <div class="stats" id="dash-stats"></div>
-        <div class="dash-grid" id="dash-grid"></div>
-      </section>
-
-      <!-- 套餐管理 -->
-      <section id="view-plans" hidden>
-        <div class="view-head">
-          <div>
-            <h1>套餐管理</h1>
-            <div class="sub">添加、编辑或删除套餐配置，密钥保存在系统凭据库</div>
+            <h1>套餐</h1>
+            <div class="sub" id="plans-sub">—</div>
           </div>
           <button id="btn-add" class="btn">＋ 添加套餐</button>
         </div>
@@ -52,16 +41,13 @@
       <!-- 设置 -->
       <section id="view-settings" hidden>
         <div class="view-head">
-          <div>
-            <h1>设置</h1>
-            <div class="sub">更改即时生效并自动保存</div>
-          </div>
+          <div><h1>设置</h1></div>
         </div>
 
-        <div class="settings-group">
-          <h3>外观</h3>
-          <div class="setting-row">
-            <div><div class="label">主题</div></div>
+        <div class="sec">
+          <div class="sec-title">外观</div>
+          <div class="set-row">
+            <div class="label">主题</div>
             <div class="setting-ctl">
               <div class="seg" id="seg-theme">
                 <button data-v="system">系统</button>
@@ -70,64 +56,36 @@
               </div>
             </div>
           </div>
-          <div class="setting-row">
-            <div>
-              <div class="label">主题色</div>
-              <div class="desc">进度条、按钮与高亮的强调色，悬浮窗实时跟随</div>
-            </div>
+          <div class="set-row">
+            <div class="label">主题色</div>
             <div class="setting-ctl" id="accent-ctl">
               <div class="seg" id="accent-presets"></div>
-              <input type="color" id="accent-picker" value="#5b8cff" title="拾色器" />
-              <input type="text" id="accent-hex" class="hex-input" placeholder="#5B8CFF" maxlength="7" spellcheck="false" title="输入 #RRGGBB" />
-              <button id="accent-reset" class="link">默认</button>
-            </div>
-          </div>
-          <div class="setting-row">
-            <div>
-              <div class="label">进度样式</div>
-              <div class="desc">卡片额度的展示形式，弹窗与仪表盘统一生效</div>
-            </div>
-            <div class="setting-ctl">
-              <div class="seg" id="seg-barstyle">
-                <button data-v="bar">平滑填充</button>
-                <button data-v="ring">环形百分比</button>
-              </div>
+              <input type="color" id="accent-picker" value="#7c5cff" title="拾色器" />
+              <input type="text" id="accent-hex" class="hex-input" placeholder="#7C5CFF" maxlength="7" spellcheck="false" title="输入 #RRGGBB" />
+              <button id="accent-reset" class="txt-btn">默认</button>
             </div>
           </div>
         </div>
 
-        <div class="settings-group">
-          <h3>悬浮弹窗</h3>
-          <div class="setting-row">
-            <div>
-              <div class="label">固定展示的套餐</div>
-              <div class="desc">最多选择 10 家常驻弹窗顶部（点击卡片可跳转官网），其余收进弹窗"更多"折叠区</div>
-            </div>
+        <div class="sec">
+          <div class="sec-title">悬浮弹窗</div>
+          <div class="set-row">
+            <div class="label">固定展示</div>
             <div class="popup-pick" id="popup-pick"></div>
           </div>
         </div>
 
-        <div class="settings-group">
-          <h3>刷新</h3>
-          <div class="setting-row">
-            <div>
-              <div class="label">自动刷新间隔</div>
-              <div class="desc">后台定时拉取所有启用套餐的额度（最小 10 秒）</div>
-            </div>
+        <div class="sec">
+          <div class="sec-title">刷新与通知</div>
+          <div class="set-row">
+            <div class="label">自动刷新间隔</div>
             <div class="setting-ctl">
               <input type="number" id="in-refresh" min="10" max="86400" step="5" />
-              <span style="font-size:12px;color:var(--text-2)">秒</span>
+              <span style="font-size:11px;color:var(--text-t)">秒</span>
             </div>
           </div>
-        </div>
-
-        <div class="settings-group">
-          <h3>通知</h3>
-          <div class="setting-row">
-            <div>
-              <div class="label">提醒频率</div>
-              <div class="desc">额度越过阈值后的重复提醒方式（阈值在每个套餐中单独设置）</div>
-            </div>
+          <div class="set-row">
+            <div class="label">提醒频率</div>
             <div class="setting-ctl">
               <div class="seg" id="seg-notify">
                 <button data-v="off">不通知</button>
@@ -136,68 +94,71 @@
               </div>
             </div>
           </div>
-          <div class="setting-row" id="row-notify-interval" hidden>
-            <div><div class="label">重复提醒间隔</div><div class="desc">同一告警每隔该时长再次提醒</div></div>
+          <div class="set-row" id="row-notify-interval" hidden>
+            <div class="label">重复提醒间隔</div>
             <div class="setting-ctl">
               <input type="number" id="in-notify-interval" min="1" max="10080" />
-              <span style="font-size:12px;color:var(--text-2)">分钟</span>
+              <span style="font-size:11px;color:var(--text-t)">分钟</span>
             </div>
           </div>
-          <div class="setting-row" id="row-notify-count" hidden>
-            <div><div class="label">提醒频率（次数）</div><div class="desc">同一告警每累计 N 次刷新提醒一次</div></div>
+          <div class="set-row" id="row-notify-count" hidden>
+            <div class="label">提醒频率（次数）</div>
             <div class="setting-ctl">
               <input type="number" id="in-notify-count" min="1" max="1000" />
-              <span style="font-size:12px;color:var(--text-2)">次刷新</span>
+              <span style="font-size:11px;color:var(--text-t)">次刷新</span>
             </div>
           </div>
         </div>
 
-        <div class="settings-group">
-          <h3>系统</h3>
-          <div class="setting-row">
-            <div><div class="label">开机自动启动</div><div class="desc">登录系统后静默驻留托盘</div></div>
+        <div class="sec">
+          <div class="sec-title">系统</div>
+          <div class="set-row">
+            <div class="label">开机自动启动</div>
             <div class="setting-ctl">
               <label class="switch"><input type="checkbox" id="in-autostart" /><i></i></label>
             </div>
           </div>
-          <div class="setting-row">
-            <div>
-              <div class="label">托盘图标</div>
-              <div class="desc">使用自定义图片替换托盘图标（PNG）</div>
-            </div>
-            <div class="setting-ctl">
-              <img id="icon-preview" class="icon-preview" alt="图标预览" hidden />
-              <button id="btn-icon-pick" class="btn ghost">选择图片</button>
-              <button id="btn-icon-reset" class="link">恢复默认</button>
-            </div>
-          </div>
-          <div class="setting-row">
-            <div><div class="label">自动检查更新</div><div class="desc">启动时 + 每 24 小时后台检查，有新版本才提醒</div></div>
+          <div class="set-row">
+            <div class="label">自动检查更新</div>
             <div class="setting-ctl">
               <label class="switch"><input type="checkbox" id="in-auto-update" /><i></i></label>
             </div>
           </div>
-          <div class="setting-row">
-            <div><div class="label">数据目录</div><div class="desc" id="config-dir">—</div></div>
+          <div class="set-row">
+            <div class="label">托盘图标</div>
+            <div class="setting-ctl">
+              <img id="icon-preview" class="icon-preview" alt="" hidden />
+              <button id="btn-icon-pick" class="btn ghost">选择图片</button>
+              <button id="btn-icon-reset" class="txt-btn" hidden>恢复默认</button>
+            </div>
           </div>
         </div>
+      </section>
 
-        <div class="settings-group">
-          <h3>关于</h3>
-          <div class="setting-row">
-            <div>
-              <div class="label">Coding Plan Limit <span style="color:var(--text-3);font-weight:400">v0.2.0</span></div>
-              <div class="desc">聚合展示多个 AI Coding Plan 套餐额度 · 数据仅保存在本地<br />
-              窗口型套餐"有啥显示啥"；已支持 15 个内置模板（详见 README）</div>
-            </div>
-            <div class="setting-ctl">
-              <button id="btn-check-update" class="btn ghost">检查更新</button>
-              <button id="btn-repo" class="btn ghost">GitHub 仓库</button>
-            </div>
+      <!-- 关于 -->
+      <section id="view-about" hidden>
+        <div class="view-head">
+          <div>
+            <h1>关于</h1>
+            <div class="sub">Plan Limit <span id="about-version">v—</span></div>
           </div>
-          <div class="setting-row">
-            <div><div class="label">待支持</div>
-            <div class="desc">火山引擎 Coding Plan（AK/SK 签名）、AWS Bedrock（CloudWatch）、xAI Grok 订阅（OAuth）——将在后续版本提供</div></div>
+        </div>
+        <div class="sec">
+          <div class="sec-title">更新</div>
+          <div class="set-row">
+            <div class="label">检查更新</div>
+            <div class="setting-ctl"><button id="btn-check-update" class="btn ghost">检查更新</button></div>
+          </div>
+          <div class="set-row">
+            <div class="label">GitHub 仓库</div>
+            <div class="setting-ctl"><button id="btn-repo" class="btn ghost">打开</button></div>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="sec-title">数据</div>
+          <div class="set-row">
+            <div class="label">数据目录</div>
+            <div class="setting-ctl" style="max-width:320px;overflow:hidden;text-overflow:ellipsis"><span style="font-size:11px;color:var(--text-t)" id="config-dir">—</span></div>
           </div>
         </div>
       </section>
@@ -210,16 +171,24 @@
       <h2 id="modal-title">添加套餐</h2>
       <div class="tpl-grid" id="tpl-grid"></div>
       <div class="form-grid" id="plan-form" hidden>
+        <div class="form-item" id="f-kimi-variant-item" hidden>
+          <label>Kimi 类型</label>
+          <div class="seg" id="seg-kimi-variant">
+            <button data-v="kimi">余额计费</button>
+            <button data-v="kimi-coding">Coding Plan</button>
+          </div>
+          <div class="hint">余额计费查询账户余额；Coding Plan 查询 5 小时 / 周窗口用量</div>
+        </div>
         <div class="form-item">
           <label>套餐名称</label>
           <input type="text" id="f-name" placeholder="例如：GLM-4.6 Pro" />
         </div>
         <div class="form-item">
-          <label>套餐 Logo（可选，自定义后显示在卡片标题前）</label>
+          <label>套餐 Logo（可选）</label>
           <div class="logo-row">
-            <img id="f-logo-preview" class="logo-preview" alt="" hidden />
+            <img id="f-logo-preview" class="icon-preview" alt="" hidden />
             <button type="button" class="btn ghost" id="btn-logo-pick">选择图片</button>
-            <button type="button" class="link" id="btn-logo-reset" hidden>恢复默认</button>
+            <button type="button" class="txt-btn" id="btn-logo-reset" hidden>恢复默认</button>
           </div>
         </div>
         <div class="form-item" id="f-region-item" hidden>
@@ -237,16 +206,15 @@
         <div class="form-item" id="f-cookie-item" hidden>
           <label>浏览器 Cookie</label>
           <textarea id="f-cookie" rows="3" placeholder="从浏览器 DevTools 网络请求中复制完整 Cookie"></textarea>
-          <div class="hint">登录平台网页版后，通过 DevTools 获取；过期后需重新粘贴</div>
         </div>
         <div class="form-item" id="f-cookie-key-item" hidden>
-          <label>API Key（可选，Cookie 失效时兜底）</label>
+          <label>API Key（可选）</label>
           <input type="password" id="f-cookie-key" placeholder="" />
         </div>
         <div class="form-item" id="f-ak-item" hidden>
           <label>AccessKey ID</label>
           <input type="password" id="f-ak-id" placeholder="" />
-          <div class="hint">阿里云主账号 RAM 密钥（非 DashScope API Key），用于 BSS 余额查询</div>
+          <div class="hint">阿里云主账号 RAM 密钥（非 DashScope API Key）</div>
         </div>
         <div class="form-item" id="f-ak-secret-item" hidden>
           <label>AccessKey Secret</label>

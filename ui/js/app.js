@@ -1,14 +1,15 @@
-// 主窗口逻辑：仪表盘 / 套餐管理 / 设置（更改即时保存）
-
+// 主窗口逻辑：套餐 / 设置 / 关于（更改即时保存，无成功提示）
 const $ = (id) => document.getElementById(id);
 
 const state = {
   views: [],
   templates: [],
   settings: null,
-  editingId: null,      // null=新增
+  editingId: null,
   selectedTpl: null,
-  accentPresets: ['#5b8cff', '#34d399', '#f59e0b', '#f87171', '#8b5cf6', '#0ea5a3'],
+  tplVariant: 'kimi',
+  pendingLogo: null,
+  accentPresets: ['#7c5cff', '#3f7cff', '#16c8b7', '#f59e0b', '#fb7185', '#0ea5a3'],
 };
 
 // ─── 视图切换 ─────────────────────────────────────────────────
@@ -16,75 +17,52 @@ document.querySelectorAll('.side nav button').forEach((btn) => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.side nav button').forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
-    ['dash', 'plans', 'settings'].forEach((v) => {
+    ['plans', 'settings', 'about'].forEach((v) => {
       $(`view-${v}`).hidden = v !== btn.dataset.view;
     });
   });
 });
 
-// ─── 仪表盘 ───────────────────────────────────────────────────
-function renderDash() {
+// ─── 套餐列表（行式，弹窗同构） ───────────────────────────────
+function renderPlans() {
   const enabled = state.views.filter((v) => v.plan.enabled);
   const bad = enabled.filter((v) => v.snapshot && !v.snapshot.ok).length;
-  $('dash-sub').textContent = `共 ${state.views.length} 个套餐 · 启用 ${enabled.length} 个`;
+  $('plans-sub').textContent = state.views.length
+    ? `共 ${state.views.length} · 启用 ${enabled.length}${bad ? ` · 异常 ${bad}` : ''}`
+    : '尚未添加套餐';
 
-  $('dash-stats').innerHTML = `
-    <div class="stat">套餐总数<b>${state.views.length}</b></div>
-    <div class="stat">已启用<b>${enabled.length}</b></div>
-    <div class="stat">异常<b style="color:${bad ? 'var(--bad)' : 'var(--good)'}">${bad}</b></div>`;
-
-  $('dash-grid').innerHTML = state.views.length
-    ? state.views.map((v) => cardHtml(v, 'dash')).join('')
-    : `<div class="empty" style="grid-column:1/-1;padding:60px 0">
-         还没有套餐，去「套餐管理」添加第一个
-       </div>`;
-  animateCards($('dash-grid'));
-}
-
-$('btn-refresh').addEventListener('click', () => {
-  invoke('refresh_now');
-  toast('已触发刷新');
-});
-
-// ─── 套餐管理 ─────────────────────────────────────────────────
-function renderPlans() {
   const box = $('plan-list');
   if (!state.views.length) {
-    box.innerHTML = `<div class="empty" style="padding:60px 0">还没有套餐，点击右上角「添加套餐」</div>`;
+    box.innerHTML = `<div class="p-empty" style="padding:80px 0">点击右上角「添加套餐」开始</div>`;
     return;
   }
   box.innerHTML = state.views.map((v) => {
-    const m = metaOf(v);
-    const snap = v.snapshot;
-    const status = !v.plan.enabled
-      ? '已停用'
-      : snap && snap.ok
-        ? '正常'
-        : snap
-          ? `异常：${esc(snap.error || '')}`
-          : '待刷新';
-    return `
-    <div class="plan-row ${v.plan.enabled ? '' : 'disabled'}">
-      <label class="switch" title="启用/停用">
-        <input type="checkbox" data-toggle="${v.plan.id}" ${v.plan.enabled ? 'checked' : ''} /><i></i>
-      </label>
-      <div class="info">
-        <div class="name"><i style="width:8px;height:8px;border-radius:50%;background:${m.color}"></i>${esc(v.plan.name)}</div>
-        <div class="meta">${esc(m.name)} · 提醒阈值 ${v.plan.threshold} · ${esc(status)}</div>
-      </div>
-      <div class="actions">
-        <button data-edit="${v.plan.id}">编辑</button>
-        <button data-del="${v.plan.id}">删除</button>
-      </div>
-    </div>`;
+    const actions = `
+      <div class="row-actions">
+        <label class="switch" title="启用/停用">
+          <input type="checkbox" data-toggle="${v.plan.id}" ${v.plan.enabled ? 'checked' : ''} /><i></i>
+        </label>
+        <button class="txt-btn" data-edit="${v.plan.id}">编辑</button>
+        <button class="txt-btn" data-del="${v.plan.id}">删除</button>
+      </div>`;
+    return rowHtml(v, { actions });
   }).join('');
+
+  // 展开行内已隐藏的详情（主窗口直接可见明细，不依赖 hover）
+  box.querySelectorAll('.row-tip').forEach((el) => { el.style.display = 'block'; });
 
   box.querySelectorAll('[data-toggle]').forEach((el) =>
     el.addEventListener('change', () => togglePlan(el.dataset.toggle, el.checked)));
   box.querySelectorAll('[data-edit]').forEach((el) =>
     el.addEventListener('click', () => openModal(el.dataset.edit)));
   box.querySelectorAll('[data-del]').forEach((el) =>
-    el.addEventListener('click', () => removePlan(el.dataset.del)));
+    el.addEventListener('click', () => {
+      // 两步删除替代确认对话框
+      if (el.dataset.armed) { removePlan(el.dataset.del); return; }
+      el.dataset.armed = '1';
+      el.textContent = '确认删除';
+      setTimeout(() => { el.dataset.armed = ''; el.textContent = '删除'; }, 2500);
+    }));
 }
 
 async function togglePlan(id, enabled) {
@@ -92,38 +70,40 @@ async function togglePlan(id, enabled) {
   if (!view) return;
   try {
     await invoke('save_plan', { plan: { ...view.plan, enabled }, secret: null });
-    toast(enabled ? '已启用' : '已停用');
   } catch (e) {
-    toast(String(e), true);
+    toast(String(e));
   }
   await reload();
 }
 
 async function removePlan(id) {
-  const view = state.views.find((v) => v.plan.id === id);
-  if (!confirm(`确定删除套餐「${view?.plan.name}」？\n对应密钥也将一并从系统凭据库清除。`)) return;
   try {
     await invoke('delete_plan', { id });
-    toast('已删除');
   } catch (e) {
-    toast(String(e), true);
+    toast(String(e));
   }
   await reload();
 }
 
 // ─── 添加/编辑弹层 ────────────────────────────────────────────
 function renderTplGrid() {
-  $('tpl-grid').innerHTML = state.templates.map((t) => {
-    const m = PROVIDER_META[t.id] || { color: '#8b93a7' };
+  $('tpl-grid').innerHTML = state.templates.filter((t) => t.id !== 'kimi-coding').map((t) => {
+    const m = PROVIDER_META[t.id] || { color: '#8b93a7', icon: '' };
+    const label = t.id === 'kimi' ? 'Kimi' : t.name;
+    const desc = t.id === 'kimi' ? '余额计费 / Coding Plan 二选一' : t.description;
+    const glyph = m.icon
+      ? `<img class="t-logo" src="${esc(m.icon)}" alt="" />`
+      : `<i style="background:${m.color};width:7px;height:7px;border-radius:2px;transform:rotate(45deg);flex:none"></i>`;
     return `
     <button class="tpl-item ${state.selectedTpl === t.id ? 'active' : ''}" data-tpl="${t.id}">
-      <div class="t-name"><i style="background:${m.color}"></i>${esc(t.name)}</div>
-      <div class="t-desc">${esc(t.description)}</div>
+      <div class="t-name">${glyph}${esc(label)}</div>
+      <div class="t-desc">${esc(desc)}</div>
     </button>`;
   }).join('');
   $('tpl-grid').querySelectorAll('[data-tpl]').forEach((el) =>
     el.addEventListener('click', () => {
       state.selectedTpl = el.dataset.tpl;
+      if (state.selectedTpl === 'kimi' && !state.tplVariant) state.tplVariant = 'kimi';
       renderTplGrid();
       renderFormFields();
       $('plan-form').hidden = false;
@@ -132,10 +112,10 @@ function renderTplGrid() {
 }
 
 function currentTpl() {
-  return state.templates.find((t) => t.id === state.selectedTpl);
+  const id = state.selectedTpl === 'kimi' ? state.tplVariant : state.selectedTpl;
+  return state.templates.find((t) => t.id === id);
 }
 
-/** 按模板显示/隐藏表单字段 */
 function renderFormFields() {
   const t = currentTpl();
   if (!t) return;
@@ -143,6 +123,9 @@ function renderFormFields() {
   state.pendingLogo = editing ? (editing.plan.logo || null) : null;
 
   $('f-region-item').hidden = !t.has_region;
+  $('f-kimi-variant-item').hidden = state.selectedTpl !== 'kimi';
+  $('seg-kimi-variant').querySelectorAll('button').forEach((b) =>
+    b.classList.toggle('active', b.dataset.v === state.tplVariant));
   $('f-bearer-item').hidden = t.auth !== 'bearer';
   $('f-cookie-item').hidden = t.auth !== 'cookie';
   $('f-cookie-key-item').hidden = t.auth !== 'cookie';
@@ -150,7 +133,7 @@ function renderFormFields() {
   $('f-ak-secret-item').hidden = t.auth !== 'bss';
   $('f-baseurl-item').hidden = !t.needs_base_url;
   $('f-baseurl-hint').textContent = t.id === 'zhipu'
-    ? '默认 https://open.bigmodel.cn/api，国际站 https://api.z.ai/api；使用代理时填完整基础地址'
+    ? '默认 https://open.bigmodel.cn/api，国际站 https://api.z.ai/api'
     : t.id === 'packycode'
       ? '默认 https://www.packyapi.ai，其他中转站填对应地址'
       : '必填，例如 https://your-newapi-site.com';
@@ -185,7 +168,6 @@ function renderFormFields() {
   renderLogoPreview();
 }
 
-/** 表单 logo 预览：pendingLogo 为 null 时显示内置品牌图标 */
 function renderLogoPreview() {
   const t = currentTpl();
   const preview = $('f-logo-preview');
@@ -205,7 +187,6 @@ function renderLogoPreview() {
   }
 }
 
-// 自定义 logo：选图 → 居中裁方 → 压缩 96×96 PNG dataURL（随套餐配置本地保存）
 $('btn-logo-pick').addEventListener('click', () => {
   const input = document.createElement('input');
   input.type = 'file';
@@ -243,12 +224,18 @@ function validateForm() {
 
 function openModal(planId) {
   state.editingId = planId || null;
-  state.selectedTpl = planId
-    ? state.views.find((v) => v.plan.id === planId)?.plan.template
-    : null;
+  const editing = planId ? state.views.find((v) => v.plan.id === planId) : null;
+  const tplId = planId ? editing?.plan.template : null;
+  if (tplId === 'kimi' || tplId === 'kimi-coding') {
+    state.selectedTpl = 'kimi';
+    state.tplVariant = tplId;
+  } else {
+    state.selectedTpl = tplId;
+    state.tplVariant = 'kimi';
+  }
   $('modal-title').textContent = planId ? '编辑套餐' : '添加套餐';
   $('btn-delete').hidden = !planId;
-  $('plan-form').hidden = !planId; // 新增时先选模板
+  $('plan-form').hidden = !planId;
   renderTplGrid();
   if (planId) renderFormFields();
   validateForm();
@@ -261,6 +248,8 @@ function closeModal() {
     .forEach((id) => ($(id).value = ''));
   state.editingId = null;
   state.selectedTpl = null;
+  state.tplVariant = 'kimi';
+  state.pendingLogo = null;
 }
 
 $('btn-add').addEventListener('click', () => openModal(null));
@@ -269,6 +258,14 @@ $('plan-modal').addEventListener('click', (e) => {
   if (e.target === $('plan-modal')) closeModal();
 });
 $('f-name').addEventListener('input', validateForm);
+
+$('seg-kimi-variant').addEventListener('click', (e) => {
+  const v = e.target.dataset?.v;
+  if (v) {
+    state.tplVariant = v;
+    renderFormFields();
+  }
+});
 
 $('btn-save').addEventListener('click', async () => {
   const t = currentTpl();
@@ -295,11 +292,10 @@ $('btn-save').addEventListener('click', async () => {
 
   try {
     const out = await invoke('save_plan', { plan, secret });
-    if (out.warning) toast(out.warning, true);
-    else toast('已保存');
+    if (out.warning) toast(out.warning);
     closeModal();
   } catch (e) {
-    toast(String(e), true);
+    toast(String(e));
   }
   await reload();
 });
@@ -316,19 +312,17 @@ function renderSettings() {
   const s = state.settings;
   if (!s) return;
 
-  // 主题
   $('seg-theme').querySelectorAll('button').forEach((b) =>
     b.classList.toggle('active', b.dataset.v === (s.theme || 'system')));
 
-  // 主题色预设
   $('accent-presets').innerHTML = state.accentPresets
-    .map((c) => `<button data-c="${c}" style="width:22px;height:22px;border-radius:6px;background:${c}" title="${c}"></button>`)
+    .map((c) => `<button data-c="${c}" style="width:20px;height:20px;border-radius:6px;background:${c}" title="${c}"></button>`)
     .join('');
   $('accent-presets').querySelectorAll('[data-c]').forEach((b) =>
     b.addEventListener('click', () => saveSettings({ accent: b.dataset.c })));
-  $('accent-picker').value = s.accent || '#5b8cff';
+  $('accent-picker').value = s.accent || '#7c5cff';
+  $('accent-hex').value = (s.accent || '#7c5cff').toUpperCase();
 
-  // 通知
   const mode = s.notify_mode || 'interval';
   $('seg-notify').querySelectorAll('button').forEach((b) =>
     b.classList.toggle('active', b.dataset.v === mode));
@@ -341,31 +335,22 @@ function renderSettings() {
   $('in-autostart').checked = !!s.autostart;
   $('in-auto-update').checked = s.auto_check_update !== false;
 
-  // 进度样式
-  $('seg-barstyle').querySelectorAll('button').forEach((b) =>
-    b.classList.toggle('active', b.dataset.v === (s.bar_style || 'bar')));
-
-  // 主题色 hex 输入框回填
-  $('accent-hex').value = (s.accent || '#5b8cff').toUpperCase();
-
-  // 悬浮窗展示选择（最多 10，计数从当前勾选状态实时计算）
   const enabledViews = state.views.filter((v) => v.plan.enabled);
   const picked = new Set(s.popup_plan_ids || []);
-  const rows = enabledViews.map((v) => {
-    const m = metaOf(v);
-    return `
-    <label class="pick-row">
-      <input type="checkbox" data-pick="${v.plan.id}" ${picked.has(v.plan.id) ? 'checked' : ''} />
-      <span class="dot" style="background:${m.color}"></span>${esc(v.plan.name)}
-    </label>`;
-  }).join('');
   $('popup-pick').innerHTML = enabledViews.length
-    ? rows + `<div class="pick-hint" id="pick-hint"></div>`
+    ? enabledViews.map((v) => {
+        const m = metaOf(v);
+        return `
+        <label class="pick-row">
+          <input type="checkbox" data-pick="${v.plan.id}" ${picked.has(v.plan.id) ? 'checked' : ''} />
+          ${logoHtml(v)}${esc(v.plan.name)}
+        </label>`;
+      }).join('') + `<div class="pick-hint" id="pick-hint"></div>`
     : `<div class="pick-hint">暂无启用的套餐</div>`;
   const updatePickHint = () => {
     const n = $('popup-pick').querySelectorAll('[data-pick]:checked').length;
     const hint = $('pick-hint');
-    if (hint) hint.textContent = `已选 ${Math.min(n, 10)}/10（未选的按添加顺序自动补足）`;
+    if (hint) hint.textContent = `已选 ${n}/10 · 未选时默认固定 3 家`;
   };
   updatePickHint();
   $('popup-pick').querySelectorAll('[data-pick]').forEach((el) =>
@@ -375,7 +360,7 @@ function renderSettings() {
       if (ids.length > 10) {
         el.checked = false;
         ids = ids.slice(0, 10);
-        toast('悬浮窗最多固定展示 10 家', true);
+        toast('最多固定展示 10 家');
         updatePickHint();
         return;
       }
@@ -383,17 +368,17 @@ function renderSettings() {
       saveSettings({ popup_plan_ids: ids });
     }));
 
-  // 托盘图标预览
   const preview = $('icon-preview');
   if (s.custom_icon) {
     preview.src = s.custom_icon;
     preview.hidden = false;
+    $('btn-icon-reset').hidden = false;
   } else {
     preview.hidden = true;
+    $('btn-icon-reset').hidden = true;
   }
 }
 
-/** 局部更新设置并持久化（其余字段沿用当前值） */
 async function saveSettings(patch) {
   const merged = { ...state.settings, ...patch };
   try {
@@ -404,19 +389,16 @@ async function saveSettings(patch) {
       applyTheme(patch.theme);
     }
     if (patch.accent !== undefined) applyAccent(patch.accent);
-    if (patch.bar_style !== undefined) window.__barStyle = patch.bar_style === 'ring' ? 'ring' : 'bar';
   } catch (e) {
-    toast(String(e), true);
+    toast(String(e));
   }
 }
 
-// 主题切换
 $('seg-theme').addEventListener('click', (e) => {
   const v = e.target.dataset?.v;
   if (v) saveSettings({ theme: v }).then(renderSettings);
 });
 
-// 通知模式
 $('seg-notify').addEventListener('click', (e) => {
   const v = e.target.dataset?.v;
   if (v) saveSettings({ notify_mode: v }).then(renderSettings);
@@ -426,7 +408,6 @@ $('in-notify-interval').addEventListener('change', (e) =>
 $('in-notify-count').addEventListener('change', (e) =>
   saveSettings({ notify_count: Math.max(1, parseInt(e.target.value) || 10) }));
 
-// 刷新间隔 / 自启 / 自动检查更新
 $('in-refresh').addEventListener('change', (e) =>
   saveSettings({ refresh_seconds: Math.max(10, parseInt(e.target.value) || 30) }));
 $('in-autostart').addEventListener('change', (e) =>
@@ -434,42 +415,6 @@ $('in-autostart').addEventListener('change', (e) =>
 $('in-auto-update').addEventListener('change', (e) =>
   saveSettings({ auto_check_update: e.target.checked }));
 
-// ─── 更新：右上角悬浮按钮 + About 手动检查 ────────────────────
-let updateUrl = null;
-function showUpdateFloat(info) {
-  if (info && info.has_update && info.url) {
-    updateUrl = info.url;
-    $('btn-update-float').hidden = false;
-  }
-}
-$('btn-update-float').addEventListener('click', () => {
-  if (updateUrl) invoke('open_external', { url: updateUrl }).catch((e) => toast(String(e), true));
-});
-$('btn-check-update').addEventListener('click', async () => {
-  toast('正在检查更新…');
-  try {
-    const info = await invoke('check_update');
-    if (info.error) {
-      toast(`检查更新失败：${info.error}`, true);
-    } else if (info.has_update) {
-      toast(`发现新版本 v${info.latest}（当前 v${info.current}）`);
-      showUpdateFloat(info);
-      invoke('open_external', { url: info.url }).catch(() => {});
-    } else {
-      toast(`已是最新版本 v${info.current}`);
-    }
-  } catch (e) {
-    toast(String(e), true);
-  }
-});
-
-// 进度样式切换
-$('seg-barstyle').addEventListener('click', (e) => {
-  const v = e.target.dataset?.v;
-  if (v) saveSettings({ bar_style: v }).then(renderSettings);
-});
-
-// 主题色：拾色器 + #RRGGBB 输入 + 预设
 $('accent-picker').addEventListener('change', (e) => {
   const v = e.target.value;
   if (/^#[0-9a-fA-F]{6}$/.test(v)) {
@@ -482,8 +427,8 @@ $('accent-hex').addEventListener('change', (e) => {
   if (/^#[0-9a-fA-F]{6}$/.test(v)) {
     saveSettings({ accent: v }).then(renderSettings);
   } else {
-    toast('颜色格式应为 #RRGGBB，例如 #5B8CFF', true);
-    e.target.value = (state.settings.accent || '#5B8CFF').toUpperCase();
+    toast('颜色格式应为 #RRGGBB');
+    e.target.value = (state.settings.accent || '#7C5CFF').toUpperCase();
   }
 });
 $('accent-reset').addEventListener('click', () => saveSettings({ accent: null }).then(renderSettings));
@@ -500,24 +445,17 @@ $('btn-icon-pick').addEventListener('click', () => {
     reader.onload = () => {
       const img = new Image();
       img.onload = async () => {
-        // 统一缩放为 128×128 PNG dataURL 再交给 Rust
         const canvas = document.createElement('canvas');
         canvas.width = 128;
         canvas.height = 128;
         const ctx = canvas.getContext('2d');
         const side = Math.min(img.width, img.height);
-        ctx.drawImage(
-          img,
-          (img.width - side) / 2, (img.height - side) / 2, side, side,
-          0, 0, 128, 128,
-        );
-        const dataUrl = canvas.toDataURL('image/png');
+        ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 128, 128);
         try {
-          await invoke('set_custom_icon', { dataUrl });
-          toast('托盘图标已更新');
+          await invoke('set_custom_icon', { dataUrl: canvas.toDataURL('image/png') });
           await reload();
         } catch (e) {
-          toast(String(e), true);
+          toast(String(e));
         }
       };
       img.src = reader.result;
@@ -530,26 +468,66 @@ $('btn-icon-pick').addEventListener('click', () => {
 $('btn-icon-reset').addEventListener('click', async () => {
   try {
     await invoke('reset_custom_icon');
-    toast('已恢复默认图标');
     await reload();
   } catch (e) {
-    toast(String(e), true);
+    toast(String(e));
   }
+});
+
+// ─── 更新（侧边 logo 行小按钮 + 关于页手动检查） ──────────────
+let updateUrl = null;
+function showUpdateSide(info) {
+  if (info && info.has_update && info.url) {
+    updateUrl = info.url;
+    $('btn-update-side').hidden = false;
+  }
+}
+$('btn-update-side').addEventListener('click', () => {
+  if (updateUrl) invoke('open_external', { url: updateUrl }).catch(() => {});
+});
+$('btn-check-update').addEventListener('click', async () => {
+  try {
+    const info = await invoke('check_update');
+    if (info.error) {
+      toast(`检查更新失败：${info.error}`);
+    } else if (info.has_update) {
+      showUpdateSide(info);
+      invoke('open_external', { url: info.url }).catch(() => {});
+    }
+  } catch (e) {
+    toast(String(e));
+  }
+});
+
+$('btn-repo').addEventListener('click', () => {
+  invoke('open_external', { url: 'https://github.com/zander-zyx/coding-plan-limit' }).catch(() => {});
 });
 
 // ─── 数据加载与初始化 ─────────────────────────────────────────
 async function reload() {
   state.views = await invoke('get_views');
   state.settings = await invoke('get_settings');
-  renderDash();
   renderPlans();
   renderSettings();
-  // 侧栏 logo 使用自定义图标（若有）
-  if (state.settings.custom_icon && !$('logo').querySelector('img')) {
-    const img = document.createElement('img');
-    img.src = state.settings.custom_icon;
-    $('logo').prepend(img);
-    $('logo').firstChild.textContent = '';
+  renderSideLogo();
+}
+
+function renderSideLogo() {
+  const logo = $('logo');
+  const dot = $('logo-dot');
+  const custom = state.settings?.custom_icon;
+  let img = logo.querySelector('img.side-logo-img');
+  if (custom) {
+    dot.style.display = 'none';
+    if (!img) {
+      img = document.createElement('img');
+      img.className = 'side-logo-img';
+      logo.prepend(img);
+    }
+    img.src = custom;
+  } else {
+    dot.style.display = '';
+    img?.remove();
   }
 }
 
@@ -561,28 +539,25 @@ async function reload() {
   } catch { /* 忽略 */ }
   await reload();
 
-  await listen('views-updated', (e) => {
+  await listen('views-updated', async (e) => {
     state.views = e.payload || [];
-    renderDash();
     renderPlans();
   });
-
-  // 其他窗口（弹窗侧无写入口，主要防多实例场景）或后端广播的设置变更
   await listen('settings-updated', (e) => {
     if (e.payload) {
       state.settings = e.payload;
       applySettingsLook(e.payload);
       renderSettings();
+      renderSideLogo();
     }
   });
 
-  // GitHub 仓库入口
-  $('btn-repo').addEventListener('click', () => {
-    invoke('open_external', { url: 'https://github.com/zander-zyx/coding-plan-limit' })
-      .catch((err) => toast(String(err), true));
-  });
+  invoke('get_update_info').then(showUpdateSide).catch(() => {});
+  await listen('update-available', (e) => showUpdateSide(e.payload));
 
-  // 已知更新状态回填 + 后台检查结果实时显示悬浮按钮
-  invoke('get_update_info').then(showUpdateFloat).catch(() => {});
-  await listen('update-available', (e) => showUpdateFloat(e.payload));
+  try {
+    const v = await window.__TAURI__.app.getVersion();
+    $('about-version').textContent = `v${v}`;
+    $('side-version').textContent = v;
+  } catch { /* 保持占位 */ }
 })();

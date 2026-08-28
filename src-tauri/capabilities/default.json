@@ -5,6 +5,7 @@
   "windows": ["main", "popup"],
   "permissions": [
     "core:default",
+    "core:app:default",
     "core:window:allow-show",
     "core:window:allow-hide",
     "notification:default",

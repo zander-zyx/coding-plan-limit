@@ -3,32 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quota Popup</title>
+  <title>Plan Limit</title>
   <link rel="stylesheet" href="css/style.css" />
-  <style>
-    html, body { overflow: hidden; }
-  </style>
 </head>
 <body>
   <div class="panel">
     <header class="p-head">
-      <div class="brand"><span class="brand-dot"></span>Coding Plan Limit</div>
+      <span id="status-dot" class="status-dot ok"></span>
       <div class="head-actions">
-        <button id="btn-update" class="icon-btn update-btn" title="发现新版本，点击更新" hidden>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 19h16"/></svg>
+        <button id="btn-update" class="p-icon-btn" title="发现新版本" hidden>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 19h16"/></svg>
         </button>
-        <button id="btn-refresh" class="icon-btn" title="立即刷新">⟳</button>
-        <button id="btn-open" class="icon-btn" title="打开主界面">⌂</button>
+        <button id="btn-settings" class="p-icon-btn" title="设置">⚙</button>
       </div>
     </header>
     <main id="list" class="p-list"></main>
-    <footer class="p-foot">
-      <span id="updated">—</span>
-      <span class="foot-actions">
-        <button id="btn-more" class="link" hidden>更多</button>
-        <button id="btn-settings" class="link">设置</button>
-      </span>
-    </footer>
+    <footer class="p-foot"><span id="updated">—</span></footer>
   </div>
   <script src="js/common.js"></script>
   <script src="js/popup.js"></script>

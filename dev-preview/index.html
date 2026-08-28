@@ -5,15 +5,13 @@
 <title>Design Preview</title>
 <link rel="stylesheet" href="../ui/css/style.css" />
 <style>
-  body { background: #08090d; padding: 24px; display: grid; grid-template-columns: 344px 1fr; gap: 24px; align-items: start; }
-  .col-title { color:#8b93a7; font-size:12px; margin: 0 0 10px 4px; font-family: var(--font); }
-  .half { display:flex; gap:24px; }
+  body { background: #0a0a12; padding: 24px; display: grid; grid-template-columns: 280px 1fr; gap: 24px; align-items: start; }
+  .col-title { color:#6b6680; font-size:11px; margin: 0 0 10px 4px; letter-spacing:0.06em; text-transform:uppercase; }
 </style>
 </head>
 <body>
 <script>
-  // —— mock Tauri ——（必须在 common.js 之前）
-  const MOCK_SETTINGS = { theme: 'dark', accent: '#5b8cff', bar_style: 'bar', popup_plan_ids: ['a','b'] };
+  const MOCK_SETTINGS = { theme: 'dark', accent: null, bar_style: 'bar', popup_plan_ids: [] };
   window.__TAURI__ = {
     core: { invoke: async (cmd) => cmd === 'get_settings' ? MOCK_SETTINGS : [] },
     event: { listen: async () => {} },
@@ -22,92 +20,60 @@
 </script>
 <script src="../ui/js/common.js"></script>
 <script>
+  for (const k in PROVIDER_META) if (PROVIDER_META[k].icon) PROVIDER_META[k].icon = '../ui/' + PROVIDER_META[k].icon;
+
   const NOW = Math.floor(Date.now()/1000);
   const VIEWS = [
     { plan:{id:'a',template:'zhipu',name:'智谱 GLM Coding Plan',enabled:true,threshold:10,region:'cn'},
       snapshot:{ok:true,plan_id:'a',updated_at:NOW-120,quota:{kind:'windows',windows:[
-        {label:'5小时',used_percent:87.3,reset_at:NOW+8400},{label:'本周',used_percent:11.4,reset_at:NOW+200000}]}}},
+        {label:'5小时',used_percent:92.7,reset_at:NOW+8400},{label:'本周',used_percent:11.4,reset_at:NOW+200000}]}}},
     { plan:{id:'b',template:'kimi-coding',name:'Kimi For Coding',enabled:true,threshold:10,region:'cn'},
       snapshot:{ok:true,plan_id:'b',updated_at:NOW-60,quota:{kind:'windows',windows:[
-        {label:'5小时',used_percent:8.0,reset_at:NOW+15000},{label:'本周',used_percent:11,reset_at:NOW+300000}]}}},
-    { plan:{id:'c',template:'deepseek',name:'DeepSeek 按量',enabled:true,threshold:10,region:'cn'},
+        {label:'5小时',used_percent:8.0,reset_at:NOW+5000},{label:'本周',used_percent:11,reset_at:NOW+300000}]}}},
+    { plan:{id:'c',template:'deepseek',name:'DeepSeek',enabled:true,threshold:10,region:'cn'},
       snapshot:{ok:true,plan_id:'c',updated_at:NOW-90,quota:{kind:'balance',amount:42.50,currency:'CNY',note:'充值 ¥40.00 · 赠送 ¥10.00'}}},
     { plan:{id:'d',template:'codex',name:'Codex Plus',enabled:true,threshold:10,region:'cn'},
       snapshot:{ok:true,plan_id:'d',updated_at:NOW-30,quota:{kind:'windows',windows:[
-        {label:'5小时',used_percent:93.2,reset_at:NOW+3000}]}}},
-    { plan:{id:'e',template:'xiaomi',name:'小米 MiMo',enabled:true,threshold:10,region:'cn'},
-      snapshot:{ok:true,plan_id:'e',updated_at:NOW-200,quota:{kind:'fixed_quota',used_percent:66.4,used:6.64e6,total:1e7,unit:'tokens',reset_at:NOW+900000}}},
+        {label:'5小时',used_percent:96.2,reset_at:NOW+3000}]}}},
   ];
   window.__barStyle = 'bar';
-  // 预览页不在 ui/ 根路径，图标路径补前缀（真实应用中页面位于根路径，无需处理）
-  for (const k in PROVIDER_META) if (PROVIDER_META[k].icon) PROVIDER_META[k].icon = '../ui/' + PROVIDER_META[k].icon;
 
-  function popupPanel() {
-    const { primary, rest } = splitPopupViews(VIEWS, ['a','b'], 10);
-    let html = primary.map(v => cardHtml(v,'popup')).join('');
-    html += `<div class="more-divider">更多套餐</div><div class="more-list">${rest.map(v=>cardHtml(v,'mini')).join('')}</div>`;
-    return `<div class="panel" style="height:auto">
-      <header class="p-head">
-        <div class="brand"><span class="brand-dot"></span>Coding Plan Limit</div>
-        <div class="head-actions"><button class="icon-btn">⟳</button><button class="icon-btn">⌂</button></div>
-      </header>
-      <main class="p-list">${html}</main>
-      <footer class="p-foot"><span>更新于 00:46</span><span class="foot-actions"><button class="link">更多（1）</button><button class="link">设置</button></span></footer>
-    </div>`;
-  }
-  function dashGrid(style) {
-    window.__barStyle = style;
-    return `<div class="stats">
-      <div class="stat">套餐总数<b>5</b></div><div class="stat">已启用<b>5</b></div><div class="stat">异常<b style="color:var(--good)">0</b></div>
-    </div><div class="dash-grid">${VIEWS.map(v=>cardHtml(v,'dash')).join('')}</div>`;
-  }
+  // 弹窗 280px
+  const { primary, rest } = splitPopupViews(VIEWS, [], 10);
+  let ph = primary.map(v => rowHtml(v)).join('');
+  ph += `<button class="more-toggle"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg>更多 ${rest.length}</button>
+         <div class="more-wrap">${rest.map(v=>rowHtml(v,{sub:true})).join('')}</div>`;
   document.write(`
     <div>
-      <div class="col-title">弹窗 344px · bar 模式</div>
-      ${popupPanel()}
+      <div class="col-title">弹窗 280px</div>
+      <div class="panel" style="height:auto">
+        <header class="p-head">
+          <span class="status-dot warn"></span>
+          <div class="head-actions"><button class="p-icon-btn update-btn">↓</button><button class="p-icon-btn">⚙</button></div>
+        </header>
+        <main class="p-list">${ph}</main>
+        <footer class="p-foot"><span>Updated ${fmtAgo(NOW-60)}</span></footer>
+      </div>
     </div>
     <div>
-      <div class="col-title">仪表盘 · bar 模式</div>
-      <div class="app" style="height:auto;border-radius:18px;overflow:hidden">
-        <aside class="side" style="width:180px;height:auto;padding-bottom:40px">
-          <div class="logo"><span class="brand-dot"></span>Coding Plan Limit</div>
-          <nav><button class="active">仪表盘</button><button>套餐管理</button><button>设置</button></nav>
-          <div class="side-foot">v0.2.0<br/>数据仅存本地</div>
+      <div class="col-title">主窗口 · 套餐行（含控制区 + 明细）</div>
+      <div class="app" style="height:auto;border-radius:14px;overflow:hidden">
+        <aside class="side" style="height:auto;padding-bottom:30px">
+          <div class="logo"><span class="brand-dot"></span><span class="logo-text">Plan Limit</span></div>
+          <nav><button class="active">套餐</button><button>设置</button><button>关于</button></nav>
         </aside>
-        <main class="content" style="padding:24px">
-          <div class="view-head"><div><h1>仪表盘</h1><div class="sub">共 5 个套餐 · 启用 5 个</div></div><button class="btn ghost">⟳ 全部刷新</button></div>
-          ${dashGrid('bar')}
+        <main class="content" style="padding:22px 26px">
+          <div class="view-head"><div><h1>套餐</h1><div class="sub">共 4 · 启用 4</div></div><button class="btn">＋ 添加套餐</button></div>
+          ${VIEWS.map(v=>rowHtml(v,{actions:`
+            <div class="row-actions">
+              <label class="switch"><input type="checkbox" checked /><i></i></label>
+              <button class="txt-btn">编辑</button><button class="txt-btn">删除</button>
+            </div>`, main:true})).join('')}
         </main>
       </div>
-      <div class="col-title" style="margin-top:20px">仪表盘 · ring 模式</div>
-      <div class="dash-grid" style="max-width:900px">${(window.__barStyle='ring', VIEWS.map(v=>cardHtml(v,'dash')).join(''))}</div>
-      <div class="col-title" style="margin-top:20px">设置 · 表单控件</div>
-      <div class="settings-group" style="max-width:620px">
-        <h3>外观</h3>
-        <div class="setting-row">
-          <div><div class="label">主题</div><div class="desc">跟随系统 / 浅色 / 深色</div></div>
-          <div class="setting-ctl"><div class="seg"><button>系统</button><button>浅色</button><button class="active">深色</button></div></div>
-        </div>
-        <div class="setting-row">
-          <div><div class="label">主题色</div><div class="desc">悬浮窗实时跟随</div></div>
-          <div class="setting-ctl"><div class="seg">
-            <button style="width:22px;height:22px;border-radius:6px;background:#5b8cff"></button>
-            <button style="width:22px;height:22px;border-radius:6px;background:#34d399"></button>
-            <button style="width:22px;height:22px;border-radius:6px;background:#f59e0b"></button></div>
-            <input type="color" style="width:40px;height:31px" /><input class="hex-input" type="text" value="#5B8CFF" /><button class="link">默认</button>
-          </div>
-        </div>
-        <div class="setting-row">
-          <div><div class="label">自动刷新间隔</div><div class="desc">最小 10 秒</div></div>
-          <div class="setting-ctl"><input type="number" value="30" /><span style="font-size:12px;color:var(--text-2)">秒</span></div>
-        </div>
-        <div class="setting-row">
-          <div><div class="label">开机自动启动</div></div>
-          <div class="setting-ctl"><label class="switch"><input type="checkbox" checked /><i></i></label></div>
-        </div>
-      </div>
     </div>`);
-  animateCards(document.body);
+  // 主窗口模式展开明细
+  document.querySelectorAll('#plan-list .row-tip, .content .row-tip').forEach(el=>el.style.display='block');
 </script>
 </body>
 </html>

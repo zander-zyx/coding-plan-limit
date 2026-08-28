@@ -9,10 +9,40 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Manager, Rect};
 
 use crate::scheduler;
-use crate::state::{HOVER_ACTIVE, HIDE_GEN};
+use crate::state::HIDE_GEN;
 
 /// 屏幕底部安全边距（Windows 任务栏高度 ~48px，留余量）
 const TASKBAR_SAFE: f64 = 64.0;
+/// 弹窗打开时强制刷新的节流间隔（秒）：悬停连击不会轰炸 API
+const POPUP_REFRESH_THROTTLE: i64 = 60;
+/// 移出弹窗后的判定延时（毫秒）：光标仍在弹窗附近则不隐藏
+const HIDE_DELAY_MS: u64 = 600;
+/// 弹窗附近的判定边距（物理像素）：从托盘移向弹窗的途中不算"移出"
+const HIDE_MARGIN: f64 = 48.0;
+
+/// Windows：给弹窗窗口设置 DWM 圆角（Mica/Acrylic 效果层不会自动圆角）
+#[cfg(windows)]
+pub fn round_popup_corners(app: &AppHandle) {
+    use windows_sys::Win32::Graphics::Dwm::{
+        DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
+    };
+    if let Some(win) = app.get_webview_window("popup") {
+        if let Ok(hwnd) = win.hwnd() {
+            let pref = DWMWCP_ROUND as u32;
+            unsafe {
+                let _ = DwmSetWindowAttribute(
+                    hwnd.0,
+                    DWMWA_WINDOW_CORNER_PREFERENCE as u32,
+                    &pref as *const u32 as *const core::ffi::c_void,
+                    4,
+                );
+            }
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub fn round_popup_corners(_app: &AppHandle) {}
 
 pub fn create(app: &tauri::App) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "打开主界面", true, None::<&str>)?;
@@ -155,24 +185,53 @@ pub fn show_popup_at(app: &AppHandle, rect: Rect) {
     )));
     let _ = win.show();
 
-    // 每次打开弹窗都强制刷新一轮（refresh_lock 互斥，悬停连击不会并发轰炸）
+    // 打开弹窗：数据 60s 内刷新过就只重推视图，否则强制刷新一轮（互斥防并发）
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        scheduler::refresh_all(&app).await;
-        scheduler::emit_views(&app).await;
+        let stale = {
+            let state = app.state::<crate::state::AppState>();
+            crate::usage::types::now_secs() - state.last_refresh.load(Ordering::Relaxed)
+                > POPUP_REFRESH_THROTTLE
+        };
+        if stale {
+            scheduler::refresh_all(&app).await;
+        } else {
+            scheduler::emit_views(&app).await;
+        }
     });
 }
 
-/// 延迟隐藏弹窗：期间鼠标进入弹窗（HOVER_ACTIVE）或再次悬停托盘则取消
+/// 延迟隐藏弹窗：到时用"光标是否在弹窗附近"判定（JS mouseleave 在快速移出时
+/// 可能不触发，导致 HOVER 标记卡死——光标判定是唯一可靠事实源）。
+/// 光标在弹窗附近（含从托盘移向弹窗的途中）则保持显示，由后续 Leave 再调度。
 pub fn schedule_hide(app: &AppHandle) {
+    scheduler::set_hover(false);
     let gen = HIDE_GEN.fetch_add(1, Ordering::Relaxed) + 1;
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(Duration::from_millis(650)).await;
-        if HIDE_GEN.load(Ordering::Relaxed) == gen && !HOVER_ACTIVE.load(Ordering::Relaxed) {
-            if let Some(win) = app.get_webview_window("popup") {
-                let _ = win.hide();
+        tokio::time::sleep(Duration::from_millis(HIDE_DELAY_MS)).await;
+        if HIDE_GEN.load(Ordering::Relaxed) != gen {
+            return; // 期间又悬停/进入，本轮作废
+        }
+        let Some(win) = app.get_webview_window("popup") else { return };
+        if !win.is_visible().unwrap_or(false) {
+            return;
+        }
+        // 光标在弹窗附近 → 保持显示，等待下一次 Leave 重新调度
+        if let (Ok(cursor), Ok(pos), Ok(size)) =
+            (app.cursor_position(), win.outer_position(), win.outer_size())
+        {
+            let (cx, cy) = (cursor.x, cursor.y);
+            let (x, y) = (pos.x as f64, pos.y as f64);
+            let (w, h) = (size.width as f64, size.height as f64);
+            if cx >= x - HIDE_MARGIN
+                && cx <= x + w + HIDE_MARGIN
+                && cy >= y - HIDE_MARGIN
+                && cy <= y + h + HIDE_MARGIN
+            {
+                return;
             }
         }
+        let _ = win.hide();
     });
 }

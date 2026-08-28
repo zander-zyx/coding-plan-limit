@@ -64,7 +64,7 @@ fn main() {
                 }
             }
 
-            // 应用自定义托盘图标
+            // 应用自定义托盘图标（同时同步主窗口标题栏图标）
             if let Some(data_url) = store::load_settings(app.handle()).custom_icon {
                 if let Some(payload) = data_url.strip_prefix("data:image/png;base64,") {
                     if let Ok(raw) = base64::Engine::decode(
@@ -72,11 +72,17 @@ fn main() {
                         payload,
                     ) {
                         if let Ok(img) = tauri::image::Image::from_bytes(&raw[..]) {
-                            commands::apply_tray_icon(app.handle(), img);
+                            commands::apply_tray_icon(app.handle(), img.clone());
+                            if let Some(win) = app.get_webview_window("main") {
+                                let _ = win.set_icon(img);
+                            }
                         }
                     }
                 }
             }
+
+            // Windows：弹窗 Mica/Acrylic 效果层设置 DWM 圆角
+            tray::round_popup_corners(app.handle());
 
             // 同步开机自启状态
             {

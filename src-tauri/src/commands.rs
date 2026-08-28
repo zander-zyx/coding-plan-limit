@@ -220,7 +220,11 @@ pub fn set_custom_icon(app: AppHandle, data_url: String) -> Result<(), String> {
     .map_err(|e| format!("图标数据解码失败: {e}"))?;
     let img = tauri::image::Image::from_bytes(&raw[..])
         .map_err(|e| format!("图标解析失败: {e}"))?;
-    apply_tray_icon(&app, img);
+    apply_tray_icon(&app, img.clone());
+    // 同步主窗口标题栏/任务栏图标（任务栏常驻图标仍以 exe 内置图标为准，运行时无法替换）
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.set_icon(img);
+    }
 
     store::update_config(&app, |config| {
         config.settings.custom_icon = Some(data_url);
