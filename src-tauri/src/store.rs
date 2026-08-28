@@ -27,6 +27,9 @@ pub struct Config {
     /// 系统凭据库不可用时的明文兜底（启动/保存时会向用户提示风险）
     #[serde(default)]
     pub fallback_secrets: HashMap<String, String>,
+    /// 已提醒过的新版本号（同一版本只无感提醒一次）
+    #[serde(default)]
+    pub notified_update: Option<String>,
 }
 
 // ─── 路径 ─────────────────────────────────────────────────────────────────

@@ -101,6 +101,21 @@ document.getElementById('btn-refresh').addEventListener('click', () => {
 document.getElementById('btn-open').addEventListener('click', () => invoke('open_main'));
 document.getElementById('btn-settings').addEventListener('click', () => invoke('open_main'));
 
+// ─── 更新按钮：有新版本时出现在标题栏，点击直达下载页 ──────────
+let updateUrl = null;
+const updateBtn = document.getElementById('btn-update');
+function showUpdateBtn(info) {
+  if (info && info.has_update && info.url) {
+    updateUrl = info.url;
+    updateBtn.hidden = false;
+  }
+}
+updateBtn.addEventListener('click', () => {
+  if (updateUrl) invoke('open_external', { url: updateUrl }).catch((e) => toast(String(e), true));
+});
+invoke('get_update_info').then(showUpdateBtn).catch(() => {});
+listen('update-available', (e) => showUpdateBtn(e.payload));
+
 moreBtn.addEventListener('click', () => {
   moreOpen = !moreOpen;
   localStorage.setItem('cpl-more-open', moreOpen ? '1' : '0');

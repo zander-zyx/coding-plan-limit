@@ -7,23 +7,23 @@ const Tauri = window.__TAURI__;
 const invoke = Tauri.core.invoke;
 const listen = Tauri.event.listen;
 
-// ─── 模板元数据（name/color/homepage 与后端 templates() 对应） ──
+// ─── 模板元数据（name/color/icon/homepage 与后端 templates() 对应） ──
 const PROVIDER_META = {
-  minimax:        { name: 'MiniMax',       color: '#ff5b4a', homepage: 'https://platform.minimaxi.com' },
-  zhipu:          { name: '智谱 GLM',      color: '#3f7cff', homepage: 'https://open.bigmodel.cn' },
-  'kimi-coding':  { name: 'Kimi Coding',   color: '#16c8b7', homepage: 'https://www.kimi.com/coding' },
-  'claude-official': { name: 'Claude',     color: '#d97757', homepage: 'https://claude.ai' },
-  codex:          { name: 'Codex',         color: '#10a37f', homepage: 'https://chatgpt.com' },
-  'claude-cache': { name: 'Claude',        color: '#d97757', homepage: 'https://claude.ai' },
-  xiaomi:         { name: '小米 MiMo',     color: '#ff6900', homepage: 'https://platform.xiaomimimo.com' },
-  deepseek:       { name: 'DeepSeek',      color: '#4d6bfe', homepage: 'https://platform.deepseek.com' },
-  kimi:           { name: 'Kimi',          color: '#0ea5a3', homepage: 'https://platform.moonshot.cn' },
-  stepfun:        { name: '阶跃星辰',      color: '#8b5cf6', homepage: 'https://platform.stepfun.com' },
-  siliconflow:    { name: '硅基流动',      color: '#6366f1', homepage: 'https://cloud.siliconflow.cn' },
-  alibaba:        { name: '阿里云',        color: '#f59e0b', homepage: 'https://bailian.console.aliyun.com' },
-  packycode:      { name: 'PackyCode',     color: '#7c5cff', homepage: 'https://www.packyapi.ai' },
-  newapi:         { name: 'NewAPI',        color: '#38bdf8', homepage: '' },
-  sub2api:        { name: 'Sub2API',       color: '#94a3b8', homepage: '' },
+  minimax:        { name: 'MiniMax',       color: '#ff5b4a', icon: 'icons/minimax.svg', homepage: 'https://platform.minimaxi.com' },
+  zhipu:          { name: '智谱 GLM',      color: '#3f7cff', icon: 'icons/zhipu.svg', homepage: 'https://open.bigmodel.cn' },
+  'kimi-coding':  { name: 'Kimi Coding',   color: '#16c8b7', icon: 'icons/kimi.svg', homepage: 'https://www.kimi.com/coding' },
+  'claude-official': { name: 'Claude',     color: '#d97757', icon: 'icons/claude-official.svg', homepage: 'https://claude.ai' },
+  codex:          { name: 'Codex',         color: '#10a37f', icon: 'icons/codex.svg', homepage: 'https://chatgpt.com' },
+  'claude-cache': { name: 'Claude',        color: '#d97757', icon: 'icons/claude-cache.svg', homepage: 'https://claude.ai' },
+  xiaomi:         { name: '小米 MiMo',     color: '#ff6900', icon: 'icons/xiaomi.svg', homepage: 'https://platform.xiaomimimo.com' },
+  deepseek:       { name: 'DeepSeek',      color: '#4d6bfe', icon: 'icons/deepseek.svg', homepage: 'https://platform.deepseek.com' },
+  kimi:           { name: 'Kimi',          color: '#0ea5a3', icon: 'icons/kimi.svg', homepage: 'https://platform.moonshot.cn' },
+  stepfun:        { name: '阶跃星辰',      color: '#8b5cf6', icon: 'icons/stepfun.svg', homepage: 'https://platform.stepfun.com' },
+  siliconflow:    { name: '硅基流动',      color: '#6366f1', icon: 'icons/siliconflow.svg', homepage: 'https://cloud.siliconflow.cn' },
+  alibaba:        { name: '阿里云',        color: '#f59e0b', icon: 'icons/alibaba.svg', homepage: 'https://bailian.console.aliyun.com' },
+  packycode:      { name: 'PackyCode',     color: '#7c5cff', icon: 'icons/packycode.svg', homepage: 'https://www.packyapi.ai' },
+  newapi:         { name: 'NewAPI',        color: '#38bdf8', icon: '', homepage: '' },
+  sub2api:        { name: 'Sub2API',       color: '#94a3b8', icon: '', homepage: '' },
 };
 
 // ─── 主题 / 设置 ───────────────────────────────────────────────
@@ -143,7 +143,17 @@ function animateCards(container) {
 
 // ─── 卡片片段 ─────────────────────────────────────────────────
 function metaOf(view) {
-  return PROVIDER_META[view.plan.template] || { name: view.plan.template, color: '#8b93a7', homepage: '' };
+  return PROVIDER_META[view.plan.template] || { name: view.plan.template, color: '#8b93a7', icon: '', homepage: '' };
+}
+
+/** 套餐 logo：自定义优先，否则用内置品牌图标；都没有则显示品牌色菱形 */
+function logoHtml(view) {
+  const m = metaOf(view);
+  const src = view.plan.logo || m.icon;
+  if (src) {
+    return `<img class="card-logo" src="${esc(src)}" alt="" onerror="this.classList.add('logo-broken')" />`;
+  }
+  return `<i class="tpl-glyph" style="background:${m.color}"></i>`;
 }
 
 /** 单窗口块：标签+重置 / 大号已用% / 通栏平滑进度条 */
@@ -263,11 +273,11 @@ function cardHtml(view, mode) {
 
   const inner = mode === 'dash'
     ? `<div class="card-top"><div class="card-main">
-         <div class="card-title">${name}${badge}</div>
+         <div class="card-title">${logoHtml(view)}${name}${badge}</div>
          ${body}${updated}
        </div></div>`
     : `<div class="card-main">
-         <div class="card-title">${name}${badge}</div>
+         <div class="card-title">${logoHtml(view)}${name}${badge}</div>
          ${body}
        </div>`;
 

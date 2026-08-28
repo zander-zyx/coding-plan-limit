@@ -17,8 +17,9 @@ const TASKBAR_SAFE: f64 = 64.0;
 pub fn create(app: &tauri::App) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "打开主界面", true, None::<&str>)?;
     let refresh = MenuItem::with_id(app, "refresh", "立即刷新", true, None::<&str>)?;
+    let update = MenuItem::with_id(app, "update", "检查更新", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &refresh, &quit])?;
+    let menu = Menu::with_items(app, &[&open, &refresh, &update, &quit])?;
 
     TrayIconBuilder::with_id("main-tray")
         .icon(app.default_window_icon().expect("缺少应用图标").clone())
@@ -28,6 +29,7 @@ pub fn create(app: &tauri::App) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => show_main(app),
             "refresh" => scheduler::request_refresh(app),
+            "update" => check_update_and_notify(app),
             "quit" => app.exit(0),
             _ => {}
         })
@@ -72,6 +74,35 @@ pub fn show_main(app: &AppHandle) {
         let _ = win.unminimize();
         let _ = win.set_focus();
     }
+}
+
+/// 托盘"检查更新"：查询 GitHub Releases，有新版本则系统通知并打开下载页
+fn check_update_and_notify(app: &AppHandle) {
+    use tauri_plugin_notification::NotificationExt;
+
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let info = crate::update::latest_update().await;
+        let (title, body) = if let Some(err) = &info.error {
+            ("检查更新失败".to_string(), err.clone())
+        } else if info.has_update {
+            (
+                format!("发现新版本 v{}", info.latest),
+                format!("当前 v{}，正在打开下载页", info.current),
+            )
+        } else {
+            ("已是最新版本".to_string(), format!("当前 v{}", info.current))
+        };
+        let _ = app
+            .notification()
+            .builder()
+            .title(title)
+            .body(body)
+            .show();
+        if info.has_update {
+            let _ = crate::commands::open_external(app, info.url);
+        }
+    });
 }
 
 /// 从 Rect（Position/Size 均为枚举）提取物理坐标 (x, y, w, h)

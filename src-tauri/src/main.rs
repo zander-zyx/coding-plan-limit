@@ -14,6 +14,7 @@ mod scheduler;
 mod state;
 mod store;
 mod tray;
+mod update;
 mod usage;
 
 use tauri::{Manager, WindowEvent};
@@ -49,6 +50,8 @@ fn main() {
             commands::reset_custom_icon,
             commands::get_config_dir,
             commands::open_external,
+            update::check_update,
+            update::get_update_info,
         ])
         .setup(|app| {
             // 冷启动先载入上次快照，避免弹窗/主界面短暂空白
@@ -89,6 +92,8 @@ fn main() {
 
             tray::create(app)?;
             scheduler::start(app.handle().clone());
+            // 启动 8 秒后首查 + 每 24 小时后台无感检查更新
+            update::start_auto_check(app.handle().clone());
 
             // 首次使用（还没有套餐）直接打开主窗口，否则静默驻留托盘
             if store::load_plans(app.handle()).is_empty() {

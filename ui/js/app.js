@@ -140,6 +140,7 @@ function renderFormFields() {
   const t = currentTpl();
   if (!t) return;
   const editing = state.editingId && state.views.find((v) => v.plan.id === state.editingId);
+  state.pendingLogo = editing ? (editing.plan.logo || null) : null;
 
   $('f-region-item').hidden = !t.has_region;
   $('f-bearer-item').hidden = t.auth !== 'bearer';
@@ -181,7 +182,60 @@ function renderFormFields() {
     $('f-enabled').checked = true;
     ['f-bearer', 'f-cookie', 'f-cookie-key', 'f-ak-id', 'f-ak-secret'].forEach((id) => ($(id).placeholder = ''));
   }
+  renderLogoPreview();
 }
+
+/** 表单 logo 预览：pendingLogo 为 null 时显示内置品牌图标 */
+function renderLogoPreview() {
+  const t = currentTpl();
+  const preview = $('f-logo-preview');
+  if (state.pendingLogo) {
+    preview.src = state.pendingLogo;
+    preview.hidden = false;
+    $('btn-logo-reset').hidden = false;
+  } else {
+    const m = t ? (PROVIDER_META[t.id] || {}) : {};
+    if (m.icon) {
+      preview.src = m.icon;
+      preview.hidden = false;
+    } else {
+      preview.hidden = true;
+    }
+    $('btn-logo-reset').hidden = true;
+  }
+}
+
+// 自定义 logo：选图 → 居中裁方 → 压缩 96×96 PNG dataURL（随套餐配置本地保存）
+$('btn-logo-pick').addEventListener('click', () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/png,image/jpeg,image/webp,image/*';
+  input.onchange = () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 96;
+        canvas.height = 96;
+        const ctx = canvas.getContext('2d');
+        const side = Math.min(img.width, img.height);
+        ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 96, 96);
+        state.pendingLogo = canvas.toDataURL('image/png');
+        renderLogoPreview();
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+});
+$('btn-logo-reset').addEventListener('click', () => {
+  state.pendingLogo = null;
+  renderLogoPreview();
+});
 
 function validateForm() {
   $('btn-save').disabled = !state.selectedTpl || !$('f-name').value.trim();
@@ -229,6 +283,7 @@ $('btn-save').addEventListener('click', async () => {
     threshold: parseFloat($('f-threshold').value) || 0,
     region: t.has_region ? $('f-region').value : 'cn',
     base_url: t.needs_base_url ? $('f-baseurl').value.trim() || null : null,
+    logo: state.pendingLogo || null,
     created_at: editing ? editing.plan.created_at : Math.floor(Date.now() / 1000),
   };
   const secret = {
@@ -284,6 +339,7 @@ function renderSettings() {
 
   $('in-refresh').value = s.refresh_seconds ?? 30;
   $('in-autostart').checked = !!s.autostart;
+  $('in-auto-update').checked = s.auto_check_update !== false;
 
   // 进度样式
   $('seg-barstyle').querySelectorAll('button').forEach((b) =>
@@ -370,11 +426,42 @@ $('in-notify-interval').addEventListener('change', (e) =>
 $('in-notify-count').addEventListener('change', (e) =>
   saveSettings({ notify_count: Math.max(1, parseInt(e.target.value) || 10) }));
 
-// 刷新间隔 / 自启
+// 刷新间隔 / 自启 / 自动检查更新
 $('in-refresh').addEventListener('change', (e) =>
   saveSettings({ refresh_seconds: Math.max(10, parseInt(e.target.value) || 30) }));
 $('in-autostart').addEventListener('change', (e) =>
   saveSettings({ autostart: e.target.checked }));
+$('in-auto-update').addEventListener('change', (e) =>
+  saveSettings({ auto_check_update: e.target.checked }));
+
+// ─── 更新：右上角悬浮按钮 + About 手动检查 ────────────────────
+let updateUrl = null;
+function showUpdateFloat(info) {
+  if (info && info.has_update && info.url) {
+    updateUrl = info.url;
+    $('btn-update-float').hidden = false;
+  }
+}
+$('btn-update-float').addEventListener('click', () => {
+  if (updateUrl) invoke('open_external', { url: updateUrl }).catch((e) => toast(String(e), true));
+});
+$('btn-check-update').addEventListener('click', async () => {
+  toast('正在检查更新…');
+  try {
+    const info = await invoke('check_update');
+    if (info.error) {
+      toast(`检查更新失败：${info.error}`, true);
+    } else if (info.has_update) {
+      toast(`发现新版本 v${info.latest}（当前 v${info.current}）`);
+      showUpdateFloat(info);
+      invoke('open_external', { url: info.url }).catch(() => {});
+    } else {
+      toast(`已是最新版本 v${info.current}`);
+    }
+  } catch (e) {
+    toast(String(e), true);
+  }
+});
 
 // 进度样式切换
 $('seg-barstyle').addEventListener('click', (e) => {
@@ -494,4 +581,8 @@ async function reload() {
     invoke('open_external', { url: 'https://github.com/zander-zyx/coding-plan-limit' })
       .catch((err) => toast(String(err), true));
   });
+
+  // 已知更新状态回填 + 后台检查结果实时显示悬浮按钮
+  invoke('get_update_info').then(showUpdateFloat).catch(() => {});
+  await listen('update-available', (e) => showUpdateFloat(e.payload));
 })();

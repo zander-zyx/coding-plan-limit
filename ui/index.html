@@ -7,6 +7,11 @@
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
+  <!-- 有新版本时右上角悬浮更新按钮 -->
+  <button id="btn-update-float" class="update-float" title="发现新版本，点击前往下载" hidden>
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 19h16"/></svg>
+    <i class="update-pulse"></i>
+  </button>
   <div class="app">
     <aside class="side">
       <div class="logo" id="logo">◐ Coding Plan Limit</div>
@@ -167,6 +172,12 @@
             </div>
           </div>
           <div class="setting-row">
+            <div><div class="label">自动检查更新</div><div class="desc">启动时 + 每 24 小时后台检查，有新版本才提醒</div></div>
+            <div class="setting-ctl">
+              <label class="switch"><input type="checkbox" id="in-auto-update" /><i></i></label>
+            </div>
+          </div>
+          <div class="setting-row">
             <div><div class="label">数据目录</div><div class="desc" id="config-dir">—</div></div>
           </div>
         </div>
@@ -180,6 +191,7 @@
               窗口型套餐"有啥显示啥"；已支持 15 个内置模板（详见 README）</div>
             </div>
             <div class="setting-ctl">
+              <button id="btn-check-update" class="btn ghost">检查更新</button>
               <button id="btn-repo" class="btn ghost">GitHub 仓库</button>
             </div>
           </div>
@@ -201,6 +213,14 @@
         <div class="form-item">
           <label>套餐名称</label>
           <input type="text" id="f-name" placeholder="例如：GLM-4.6 Pro" />
+        </div>
+        <div class="form-item">
+          <label>套餐 Logo（可选，自定义后显示在卡片标题前）</label>
+          <div class="logo-row">
+            <img id="f-logo-preview" class="logo-preview" alt="" hidden />
+            <button type="button" class="btn ghost" id="btn-logo-pick">选择图片</button>
+            <button type="button" class="link" id="btn-logo-reset" hidden>恢复默认</button>
+          </div>
         </div>
         <div class="form-item" id="f-region-item" hidden>
           <label>站点区域</label>

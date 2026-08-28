@@ -103,6 +103,9 @@ pub struct PlanConfig {
     /// 可选：覆盖 API 基础地址（如自建代理 / 智谱自定义 base）
     #[serde(default)]
     pub base_url: Option<String>,
+    /// 自定义套餐 logo（PNG dataURL，由前端压缩后传入；None = 使用内置品牌图标）
+    #[serde(default)]
+    pub logo: Option<String>,
     #[serde(default)]
     pub created_at: i64,
 }
@@ -162,6 +165,9 @@ pub struct Settings {
     /// 卡片进度样式：bar（平滑填充，默认）| ring（环形百分比）
     #[serde(default = "default_bar_style")]
     pub bar_style: String,
+    /// 自动检查更新（启动时 + 每 24 小时，有新版本才提醒）
+    #[serde(default = "default_true")]
+    pub auto_check_update: bool,
     /// 自定义托盘图标（PNG dataURL；None = 使用内置默认图标）
     #[serde(default)]
     pub custom_icon: Option<String>,
@@ -202,6 +208,7 @@ impl Default for Settings {
             popup_plan_ids: Vec::new(),
             accent: None,
             bar_style: default_bar_style(),
+            auto_check_update: true,
         }
     }
 }

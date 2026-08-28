@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <title>Design Preview</title>
-<link rel="stylesheet" href="../css/style.css" />
+<link rel="stylesheet" href="../ui/css/style.css" />
 <style>
   body { background: #08090d; padding: 24px; display: grid; grid-template-columns: 344px 1fr; gap: 24px; align-items: start; }
   .col-title { color:#8b93a7; font-size:12px; margin: 0 0 10px 4px; font-family: var(--font); }
@@ -20,7 +20,7 @@
   };
   window.matchMedia = () => ({ matches: true, addEventListener() {} });
 </script>
-<script src="../js/common.js"></script>
+<script src="../ui/js/common.js"></script>
 <script>
   const NOW = Math.floor(Date.now()/1000);
   const VIEWS = [
@@ -39,6 +39,8 @@
       snapshot:{ok:true,plan_id:'e',updated_at:NOW-200,quota:{kind:'fixed_quota',used_percent:66.4,used:6.64e6,total:1e7,unit:'tokens',reset_at:NOW+900000}}},
   ];
   window.__barStyle = 'bar';
+  // 预览页不在 ui/ 根路径，图标路径补前缀（真实应用中页面位于根路径，无需处理）
+  for (const k in PROVIDER_META) if (PROVIDER_META[k].icon) PROVIDER_META[k].icon = '../ui/' + PROVIDER_META[k].icon;
 
   function popupPanel() {
     const { primary, rest } = splitPopupViews(VIEWS, ['a','b'], 10);

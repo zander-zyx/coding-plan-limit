@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64};
 
 use tokio::sync::{Mutex, Notify};
 
+use crate::update::UpdateInfo;
 use crate::usage::types::Snapshot;
 
 #[derive(Default)]
@@ -19,6 +20,8 @@ pub struct AppState {
     pub refresh_lock: Mutex<()>,
     /// 上次成功刷新时间（unix 秒）
     pub last_refresh: AtomicI64,
+    /// 最新版本检查结果（有更新时 UI 显示更新按钮）
+    pub update_info: Mutex<Option<UpdateInfo>>,
 }
 
 #[derive(Debug, Clone)]
