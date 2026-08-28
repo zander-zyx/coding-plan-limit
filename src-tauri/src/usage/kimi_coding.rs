@@ -42,7 +42,7 @@ pub async fn query(bearer: &str) -> Result<Quota, String> {
     }
 
     if windows.is_empty() {
-        return Err("响应中无用量数据".into());
+        return Err("暂不支持：接口未返回窗口额度数据".into());
     }
     Ok(Quota::Windows { windows })
 }

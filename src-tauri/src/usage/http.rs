@@ -36,7 +36,10 @@ pub async fn get_json(
         let brief: String = text.chars().take(160).collect();
         return Err(format!("HTTP {}: {brief}", status.as_u16()));
     }
-    serde_json::from_str(&text).map_err(|e| format!("JSON 解析失败: {e}"))
+    serde_json::from_str(&text).map_err(|e| {
+        let brief: String = text.chars().take(120).collect();
+        format!("JSON 解析失败: {e}；响应内容: {brief}")
+    })
 }
 
 /// 从 serde_json::Value 安全取 f64（数字或数字字符串）

@@ -153,6 +153,10 @@ pub fn save_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
         }
     }
 
+    // 广播设置变更（弹窗实时跟随主题色/主题/进度样式）
+    let latest = store::load_settings(&app);
+    let _ = tauri::Emitter::emit(&app, "settings-updated", &latest);
+
     // 让调度循环立即按新间隔工作
     scheduler::request_refresh(&app);
     Ok(())
@@ -177,6 +181,18 @@ pub fn set_popup_hover(app: AppHandle, active: bool) {
     if !active {
         tray::schedule_hide(&app);
     }
+}
+
+/// 用系统浏览器打开链接（弹窗点击套餐卡片跳转官网 / About 页仓库链接）
+#[tauri::command]
+pub fn open_external(app: AppHandle, url: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err("仅允许打开 http(s) 链接".into());
+    }
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| format!("打开链接失败: {e}"))
 }
 
 #[tauri::command]

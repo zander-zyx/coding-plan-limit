@@ -131,25 +131,42 @@ input, select, textarea { font: inherit; color: var(--text); }
 .big-amount small { font-size: 12px; font-weight: 500; color: var(--text-2); }
 
 .card .error { color: var(--bad); font-size: 12px; margin-top: 8px; line-height: 1.4; }
+.card .notice { color: var(--text-2); font-size: 12px; margin-top: 8px; line-height: 1.4; }
+
+/* 环形行（进度样式 = ring） */
+.ring-row {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.ring-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.ring-cap { font-size: 11px; color: var(--text-2); }
+.ring-reset { font-size: 9.5px; color: var(--text-3); }
 
 /* 状态色（低余量时进度条/环形自动变色） */
 .st-ok   { --ring-color: var(--accent); --bar-color: var(--accent); }
 .st-warn { --ring-color: var(--warn);   --bar-color: var(--warn); }
 .st-bad  { --ring-color: var(--bad);    --bar-color: var(--bad); }
 
-/* ─── 弹窗面板 ───────────────────────────────────────────────── */
+/* ─── 弹窗面板（不透明底：系统级模糊会让圆角四角出现直角伪影，弃用） ── */
 .panel {
   height: 100vh;
   display: flex;
   flex-direction: column;
   border-radius: 16px;
-  background: var(--panel);
-  backdrop-filter: blur(30px) saturate(1.35);
-  -webkit-backdrop-filter: blur(30px) saturate(1.35);
+  background: var(--panel-solid, var(--bg-2));
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
   overflow: hidden;
 }
+html[data-theme='dark'] .panel { background: #1b1e29; }
+html[data-theme='light'] .panel { background: #fbfbfd; }
 
 .p-head {
   display: flex;
@@ -415,6 +432,13 @@ input[type='color'] {
   border: 1px solid var(--border); border-radius: 8px;
   background: var(--bg-2); cursor: pointer;
 }
+.hex-input {
+  width: 86px !important;
+  text-align: center;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+}
 
 .icon-preview {
   width: 44px; height: 44px;
@@ -425,7 +449,7 @@ input[type='color'] {
 }
 
 /* 悬浮窗展示选择 */
-.popup-pick { display: flex; flex-direction: column; gap: 6px; min-width: 220px; }
+.popup-pick { display: flex; flex-direction: column; gap: 4px; min-width: 240px; max-height: 190px; overflow-y: auto; padding: 2px; }
 .popup-pick .pick-row {
   display: flex; align-items: center; gap: 8px;
   font-size: 12.5px;

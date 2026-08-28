@@ -15,7 +15,7 @@
         <button data-view="plans">套餐管理</button>
         <button data-view="settings">设置</button>
       </nav>
-      <div class="side-foot">v0.1.0<br />所有数据仅保存在本地</div>
+      <div class="side-foot">v0.2.0<br />所有数据仅保存在本地</div>
     </aside>
 
     <main class="content">
@@ -68,12 +68,25 @@
           <div class="setting-row">
             <div>
               <div class="label">主题色</div>
-              <div class="desc">进度条、按钮与高亮的强调色</div>
+              <div class="desc">进度条、按钮与高亮的强调色，悬浮窗实时跟随</div>
             </div>
             <div class="setting-ctl" id="accent-ctl">
               <div class="seg" id="accent-presets"></div>
-              <input type="color" id="accent-picker" value="#5b8cff" title="自定义颜色" />
+              <input type="color" id="accent-picker" value="#5b8cff" title="拾色器" />
+              <input type="text" id="accent-hex" class="hex-input" placeholder="#5B8CFF" maxlength="7" spellcheck="false" title="输入 #RRGGBB" />
               <button id="accent-reset" class="link">默认</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="label">进度样式</div>
+              <div class="desc">卡片额度的展示形式，弹窗与仪表盘统一生效</div>
+            </div>
+            <div class="setting-ctl">
+              <div class="seg" id="seg-barstyle">
+                <button data-v="bar">平滑填充</button>
+                <button data-v="ring">环形百分比</button>
+              </div>
             </div>
           </div>
         </div>
@@ -83,7 +96,7 @@
           <div class="setting-row">
             <div>
               <div class="label">固定展示的套餐</div>
-              <div class="desc">最多选择 2 家常驻弹窗顶部，其余收进弹窗"更多"折叠区</div>
+              <div class="desc">最多选择 10 家常驻弹窗顶部（点击卡片可跳转官网），其余收进弹窗"更多"折叠区</div>
             </div>
             <div class="popup-pick" id="popup-pick"></div>
           </div>
@@ -157,6 +170,24 @@
             <div><div class="label">数据目录</div><div class="desc" id="config-dir">—</div></div>
           </div>
         </div>
+
+        <div class="settings-group">
+          <h3>关于</h3>
+          <div class="setting-row">
+            <div>
+              <div class="label">Coding Plan Limit <span style="color:var(--text-3);font-weight:400">v0.2.0</span></div>
+              <div class="desc">聚合展示多个 AI Coding Plan 套餐额度 · 数据仅保存在本地<br />
+              窗口型套餐"有啥显示啥"；已支持 15 个内置模板（详见 README）</div>
+            </div>
+            <div class="setting-ctl">
+              <button id="btn-repo" class="btn ghost">GitHub 仓库</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div><div class="label">待支持</div>
+            <div class="desc">火山引擎 Coding Plan（AK/SK 签名）、AWS Bedrock（CloudWatch）、xAI Grok 订阅（OAuth）——将在后续版本提供</div></div>
+          </div>
+        </div>
       </section>
     </main>
   </div>
@@ -202,9 +233,9 @@
           <input type="password" id="f-ak-secret" placeholder="" />
         </div>
         <div class="form-item" id="f-baseurl-item" hidden>
-          <label>API 地址（可选）</label>
-          <input type="text" id="f-baseurl" placeholder="默认 https://open.bigmodel.cn，国际站 https://api.z.ai" />
-          <div class="hint">使用代理或私有部署时填写完整基础地址</div>
+          <label>站点 API 地址</label>
+          <input type="text" id="f-baseurl" placeholder="" />
+          <div class="hint" id="f-baseurl-hint"></div>
         </div>
         <div class="form-item">
           <label id="f-threshold-label">提醒阈值</label>

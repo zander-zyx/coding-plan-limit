@@ -1,6 +1,6 @@
 [package]
 name = "coding-plan-limit"
-version = "0.1.0"
+version = "0.2.0"
 description = "聚合展示多个 Coding Plan / Token Plan 套餐剩余额度"
 edition = "2021"
 
@@ -12,6 +12,7 @@ tauri = { version = "2", features = ["tray-icon", "macos-private-api", "image-pn
 tauri-plugin-notification = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
+tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip"] }
@@ -22,7 +23,7 @@ keyring = { version = "3", features = ["windows-native", "apple-native", "sync-s
 hmac = "0.12"
 sha1 = "0.10"
 base64 = "0.22"
-time = { version = "0.3", features = ["formatting"] }
+time = { version = "0.3", features = ["formatting", "parsing"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.60", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }

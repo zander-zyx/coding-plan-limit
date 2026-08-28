@@ -5,7 +5,8 @@ use super::http::{f64_of, get_json, ms_to_secs};
 use super::types::{Quota, WindowQuota};
 
 /// 从用户 base_url（或区域默认）推导监控端点：
-/// 去掉 /anthropic 后缀 + 拼 /monitor/usage/quota/limit
+/// 完整端点形如 https://open.bigmodel.cn/api/monitor/usage/quota/limit
+/// 用户若粘贴完整 Anthropic 地址（如 https://open.bigmodel.cn/api/anthropic）则剥掉 /anthropic 后缀
 fn resolve_base(region: &str, base_url: Option<&str>) -> String {
     let raw = base_url
         .map(str::trim)
@@ -13,24 +14,36 @@ fn resolve_base(region: &str, base_url: Option<&str>) -> String {
         .map(str::to_string)
         .unwrap_or_else(|| {
             if region == "intl" {
-                "https://api.z.ai".to_string()
+                "https://api.z.ai/api".to_string()
             } else {
-                "https://open.bigmodel.cn".to_string()
+                "https://open.bigmodel.cn/api".to_string()
             }
         });
     let trimmed = raw.trim_end_matches('/');
     match trimmed.strip_suffix("/anthropic") {
-        Some(stripped) => stripped.to_string(),
+        Some(stripped) => stripped.trim_end_matches('/').to_string(),
         None => trimmed.to_string(),
     }
 }
 
 pub async fn query(region: &str, base_url: Option<&str>, bearer: &str) -> Result<Quota, String> {
     let url = format!("{}/monitor/usage/quota/limit", resolve_base(region, base_url));
-    let json = get_json(&url, &[("Authorization", format!("Bearer {bearer}"))]).await?;
+    let json = get_json(
+        &url,
+        &[
+            ("Authorization", format!("Bearer {bearer}")),
+            ("Accept-Language", "en-US,en".into()),
+        ],
+    )
+    .await?;
 
     if json.get("success").and_then(|v| v.as_bool()) != Some(true) {
-        return Err("接口返回 success=false".into());
+        let msg = json
+            .get("msg")
+            .or_else(|| json.get("message"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("未知错误");
+        return Err(format!("智谱接口: {msg}"));
     }
     let data = json.get("data").ok_or("响应缺少 data")?;
     let limits = data

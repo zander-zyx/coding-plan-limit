@@ -30,6 +30,7 @@ fn main() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             commands::list_templates,
@@ -47,6 +48,7 @@ fn main() {
             commands::set_custom_icon,
             commands::reset_custom_icon,
             commands::get_config_dir,
+            commands::open_external,
         ])
         .setup(|app| {
             // 冷启动先载入上次快照，避免弹窗/主界面短暂空白

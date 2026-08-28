@@ -13,8 +13,6 @@ use crate::usage::types::{NotifyMode, PlanConfig, PlanView, Quota, Snapshot};
 use crate::usage;
 
 /// 距上次刷新超过该秒数，弹窗打开时才触发即时刷新（节流）
-const STALE_SECS: i64 = 120;
-
 pub fn start(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
@@ -46,14 +44,6 @@ async fn wait_interval(app: &AppHandle) {
 /// 即使刷新正在进行，等待方也能在结束后立即收到信号。
 pub fn request_refresh(app: &AppHandle) {
     app.state::<AppState>().refresh_signal.notify_one();
-}
-
-/// 弹窗打开时调用：数据陈旧才刷新
-pub async fn refresh_if_stale(app: &AppHandle) {
-    let last = app.state::<AppState>().last_refresh.load(Ordering::Relaxed);
-    if crate::usage::types::now_secs() - last > STALE_SECS {
-        refresh_all(app).await;
-    }
 }
 
 /// 并发刷新所有启用的套餐 → 更新状态/缓存 → 推送视图 → 阈值通知。

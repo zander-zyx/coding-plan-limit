@@ -11,6 +11,9 @@ use tauri::{AppHandle, Manager, Rect};
 use crate::scheduler;
 use crate::state::{HOVER_ACTIVE, HIDE_GEN};
 
+/// 屏幕底部安全边距（Windows 任务栏高度 ~48px，留余量）
+const TASKBAR_SAFE: f64 = 64.0;
+
 pub fn create(app: &tauri::App) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "打开主界面", true, None::<&str>)?;
     let refresh = MenuItem::with_id(app, "refresh", "立即刷新", true, None::<&str>)?;
@@ -102,14 +105,16 @@ pub fn show_popup_at(app: &AppHandle, rect: Rect) {
         // 托盘在顶部（macOS 菜单栏）→ 显示在图标下方
         y = ry + rh + 12.0;
     }
-    // 收拢进屏幕工作区内（上界与下界同基准，避免 clamp(min>max) panic）
+    // 收拢进屏幕工作区内（上界与下界同基准，避免 clamp(min>max) panic；
+    // 底部预留任务栏高度，防止弹窗压住任务栏/托盘 tooltip）
     if let Ok(Some(monitor)) = app.monitor_from_point(rx, ry) {
         let mpos = monitor.position();
         let msize = monitor.size();
         let lo_x = mpos.x as f64 + 8.0;
         let hi_x = ((mpos.x + msize.width as i32) as f64 - w - 8.0).max(lo_x);
         let lo_y = mpos.y as f64 + 8.0;
-        let hi_y = ((mpos.y + msize.height as i32) as f64 - h - 8.0).max(lo_y);
+        let hi_y = ((mpos.y + msize.height as i32) as f64 - h - 8.0 - TASKBAR_SAFE)
+            .max(lo_y);
         x = x.clamp(lo_x, hi_x);
         y = y.clamp(lo_y, hi_y);
     }
@@ -119,10 +124,10 @@ pub fn show_popup_at(app: &AppHandle, rect: Rect) {
     )));
     let _ = win.show();
 
-    // 打开时若数据陈旧则刷新，并立即推送当前视图
+    // 每次打开弹窗都强制刷新一轮（refresh_lock 互斥，悬停连击不会并发轰炸）
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        scheduler::refresh_if_stale(&app).await;
+        scheduler::refresh_all(&app).await;
         scheduler::emit_views(&app).await;
     });
 }

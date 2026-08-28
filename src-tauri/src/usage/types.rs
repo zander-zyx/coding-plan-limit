@@ -78,6 +78,11 @@ pub struct Template {
     pub quota_type: String,
     /// 是否支持国内/国际站切换
     pub has_region: bool,
+    /// 是否需要填写 API 地址（zhipu 可选；newapi 系必填）
+    pub needs_base_url: bool,
+    /// 官网首页（弹窗点击卡片跳转）
+    #[serde(default)]
+    pub homepage: String,
 }
 
 /// 用户套餐配置（密钥不在此存，走系统凭据库）
@@ -154,6 +159,9 @@ pub struct Settings {
     /// 自定义主题色（#RRGGBB；None = 默认蓝）
     #[serde(default)]
     pub accent: Option<String>,
+    /// 卡片进度样式：bar（平滑填充，默认）| ring（环形百分比）
+    #[serde(default = "default_bar_style")]
+    pub bar_style: String,
     /// 自定义托盘图标（PNG dataURL；None = 使用内置默认图标）
     #[serde(default)]
     pub custom_icon: Option<String>,
@@ -161,6 +169,9 @@ pub struct Settings {
 
 fn default_theme() -> String {
     "system".to_string()
+}
+fn default_bar_style() -> String {
+    "bar".to_string()
 }
 
 fn default_refresh_seconds() -> u32 {
@@ -190,6 +201,7 @@ impl Default for Settings {
             custom_icon: None,
             popup_plan_ids: Vec::new(),
             accent: None,
+            bar_style: default_bar_style(),
         }
     }
 }

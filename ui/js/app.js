@@ -147,7 +147,12 @@ function renderFormFields() {
   $('f-cookie-key-item').hidden = t.auth !== 'cookie';
   $('f-ak-item').hidden = t.auth !== 'bss';
   $('f-ak-secret-item').hidden = t.auth !== 'bss';
-  $('f-baseurl-item').hidden = t.id !== 'zhipu';
+  $('f-baseurl-item').hidden = !t.needs_base_url;
+  $('f-baseurl-hint').textContent = t.id === 'zhipu'
+    ? '默认 https://open.bigmodel.cn/api，国际站 https://api.z.ai/api；使用代理时填完整基础地址'
+    : t.id === 'packycode'
+      ? '默认 https://www.packyapi.ai，其他中转站填对应地址'
+      : '必填，例如 https://your-newapi-site.com';
 
   $('f-threshold-label').textContent =
     t.quota_type === 'balance' ? '余额提醒下限' : '提醒阈值（剩余 %）';
@@ -223,7 +228,7 @@ $('btn-save').addEventListener('click', async () => {
     enabled: $('f-enabled').checked,
     threshold: parseFloat($('f-threshold').value) || 0,
     region: t.has_region ? $('f-region').value : 'cn',
-    base_url: t.id === 'zhipu' ? $('f-baseurl').value.trim() || null : null,
+    base_url: t.needs_base_url ? $('f-baseurl').value.trim() || null : null,
     created_at: editing ? editing.plan.created_at : Math.floor(Date.now() / 1000),
   };
   const secret = {
@@ -280,29 +285,45 @@ function renderSettings() {
   $('in-refresh').value = s.refresh_seconds ?? 30;
   $('in-autostart').checked = !!s.autostart;
 
-  // 悬浮窗展示选择（最多 2）
+  // 进度样式
+  $('seg-barstyle').querySelectorAll('button').forEach((b) =>
+    b.classList.toggle('active', b.dataset.v === (s.bar_style || 'bar')));
+
+  // 主题色 hex 输入框回填
+  $('accent-hex').value = (s.accent || '#5b8cff').toUpperCase();
+
+  // 悬浮窗展示选择（最多 10，计数从当前勾选状态实时计算）
   const enabledViews = state.views.filter((v) => v.plan.enabled);
-  const picked = s.popup_plan_ids || [];
+  const picked = new Set(s.popup_plan_ids || []);
+  const rows = enabledViews.map((v) => {
+    const m = metaOf(v);
+    return `
+    <label class="pick-row">
+      <input type="checkbox" data-pick="${v.plan.id}" ${picked.has(v.plan.id) ? 'checked' : ''} />
+      <span class="dot" style="background:${m.color}"></span>${esc(v.plan.name)}
+    </label>`;
+  }).join('');
   $('popup-pick').innerHTML = enabledViews.length
-    ? enabledViews.map((v) => {
-        const m = metaOf(v);
-        return `
-        <label class="pick-row">
-          <input type="checkbox" data-pick="${v.plan.id}" ${picked.includes(v.plan.id) ? 'checked' : ''} />
-          <span class="dot" style="background:${m.color}"></span>${esc(v.plan.name)}
-        </label>`;
-      }).join('') +
-      `<div class="pick-hint">已选 ${Math.min(picked.length, 2)}/2（未选的按添加顺序自动补足）</div>`
+    ? rows + `<div class="pick-hint" id="pick-hint"></div>`
     : `<div class="pick-hint">暂无启用的套餐</div>`;
+  const updatePickHint = () => {
+    const n = $('popup-pick').querySelectorAll('[data-pick]:checked').length;
+    const hint = $('pick-hint');
+    if (hint) hint.textContent = `已选 ${Math.min(n, 10)}/10（未选的按添加顺序自动补足）`;
+  };
+  updatePickHint();
   $('popup-pick').querySelectorAll('[data-pick]').forEach((el) =>
     el.addEventListener('change', () => {
-      let ids = ($('popup-pick').querySelectorAll('[data-pick]:checked') || [])
+      let ids = [...$('popup-pick').querySelectorAll('[data-pick]:checked')]
         .map((x) => x.dataset.pick);
-      if (ids.length > 2) {
-        ids = ids.slice(0, 2);
-        el.checked = ids.includes(el.dataset.pick);
-        toast('悬浮窗最多固定展示 2 家', true);
+      if (ids.length > 10) {
+        el.checked = false;
+        ids = ids.slice(0, 10);
+        toast('悬浮窗最多固定展示 10 家', true);
+        updatePickHint();
+        return;
       }
+      updatePickHint();
       saveSettings({ popup_plan_ids: ids });
     }));
 
@@ -327,6 +348,7 @@ async function saveSettings(patch) {
       applyTheme(patch.theme);
     }
     if (patch.accent !== undefined) applyAccent(patch.accent);
+    if (patch.bar_style !== undefined) window.__barStyle = patch.bar_style === 'ring' ? 'ring' : 'bar';
   } catch (e) {
     toast(String(e), true);
   }
@@ -354,10 +376,28 @@ $('in-refresh').addEventListener('change', (e) =>
 $('in-autostart').addEventListener('change', (e) =>
   saveSettings({ autostart: e.target.checked }));
 
-// 主题色选择器
+// 进度样式切换
+$('seg-barstyle').addEventListener('click', (e) => {
+  const v = e.target.dataset?.v;
+  if (v) saveSettings({ bar_style: v }).then(renderSettings);
+});
+
+// 主题色：拾色器 + #RRGGBB 输入 + 预设
 $('accent-picker').addEventListener('change', (e) => {
   const v = e.target.value;
-  if (/^#[0-9a-fA-F]{6}$/.test(v)) saveSettings({ accent: v });
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+    $('accent-hex').value = v.toUpperCase();
+    saveSettings({ accent: v });
+  }
+});
+$('accent-hex').addEventListener('change', (e) => {
+  const v = e.target.value.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+    saveSettings({ accent: v }).then(renderSettings);
+  } else {
+    toast('颜色格式应为 #RRGGBB，例如 #5B8CFF', true);
+    e.target.value = (state.settings.accent || '#5B8CFF').toUpperCase();
+  }
 });
 $('accent-reset').addEventListener('click', () => saveSettings({ accent: null }).then(renderSettings));
 
@@ -438,5 +478,20 @@ async function reload() {
     state.views = e.payload || [];
     renderDash();
     renderPlans();
+  });
+
+  // 其他窗口（弹窗侧无写入口，主要防多实例场景）或后端广播的设置变更
+  await listen('settings-updated', (e) => {
+    if (e.payload) {
+      state.settings = e.payload;
+      applySettingsLook(e.payload);
+      renderSettings();
+    }
+  });
+
+  // GitHub 仓库入口
+  $('btn-repo').addEventListener('click', () => {
+    invoke('open_external', { url: 'https://github.com/zander-zyx/coding-plan-limit' })
+      .catch((err) => toast(String(err), true));
   });
 })();
