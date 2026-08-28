@@ -36,6 +36,7 @@ function render(views, settings) {
     }
   }
   list.innerHTML = html;
+  animateBars(list);
   list.querySelector('#btn-more')?.addEventListener('click', () => {
     moreOpen = !moreOpen;
     render(lastViews, lastSettings);

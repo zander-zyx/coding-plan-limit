@@ -47,6 +47,7 @@ function renderPlans() {
       </div>`;
     return rowHtml(v, { actions });
   }).join('');
+  animateBars(box);
 
   // 展开行内已隐藏的详情（主窗口直接可见明细，不依赖 hover）
   box.querySelectorAll('.row-tip').forEach((el) => { el.style.display = 'block'; });
@@ -90,14 +91,12 @@ function renderTplGrid() {
   $('tpl-grid').innerHTML = state.templates.filter((t) => t.id !== 'kimi-coding').map((t) => {
     const m = PROVIDER_META[t.id] || { color: '#8b93a7', icon: '' };
     const label = t.id === 'kimi' ? 'Kimi' : t.name;
-    const desc = t.id === 'kimi' ? '余额计费 / Coding Plan 二选一' : t.description;
     const glyph = m.icon
       ? `<img class="t-logo" src="${esc(m.icon)}" alt="" />`
       : `<i style="background:${m.color};width:7px;height:7px;border-radius:2px;transform:rotate(45deg);flex:none"></i>`;
     return `
     <button class="tpl-item ${state.selectedTpl === t.id ? 'active' : ''}" data-tpl="${t.id}">
       <div class="t-name">${glyph}${esc(label)}</div>
-      <div class="t-desc">${esc(desc)}</div>
     </button>`;
   }).join('');
   $('tpl-grid').querySelectorAll('[data-tpl]').forEach((el) =>

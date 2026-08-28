@@ -151,7 +151,7 @@ function rowHtml(view, opts = {}) {
   let barPct = -1;
   let tip = '';
   let urgent = false;
-  let extra = '';
+  let lines = '';
 
   if (!snap || !snap.ok) {
     tip = snap && snap.error ? String(snap.error) : '尚未获取数据';
@@ -162,41 +162,44 @@ function rowHtml(view, opts = {}) {
       const wins = q.windows;
       const worst = wins.reduce((a, w) => Math.max(a, w.used_percent), 0);
       right = `${worst.toFixed(worst < 10 ? 1 : 0)}%`;
-      barPct = worst;
       urgent = isUrgent(worst);
-      const resets = wins.map((w) => w.reset_at).filter(Boolean);
-      const next = resets.length ? Math.min(...resets) : null;
-      tip = `${wins.map((w) => w.label).join(' ')}${next ? ` · ${countdownCompact(next)}重置` : ''}`;
-      if (opts.main && wins.length > 1) {
-        extra = wins.slice(1).map((w) => `
-          <div class="mini-win">
-            <span>${esc(w.label)}</span>
-            <div class="bar slim"><i data-w="${w.used_percent.toFixed(1)}"></i></div>
-            <b>${w.used_percent.toFixed(0)}%</b>
-          </div>`).join('');
-      }
+      // 每个窗口一行：标签 + 进度条 + 百分比（5小时 / 周 / 月 全部可见）
+      lines = wins.map((w) => {
+        const u = w.used_percent;
+        const reset = w.reset_at ? countdownCompact(w.reset_at) : '';
+        const urgentLine = isUrgent(u) ? 'urgent' : '';
+        return `
+        <div class="win-line ${urgentLine}">
+          <span>${esc(w.label)}</span>
+          <div class="bar slim ${urgentLine}"><i data-w="${u.toFixed(1)}"></i></div>
+          <b>${u.toFixed(u < 10 ? 1 : 0)}%</b>
+          ${reset ? `<em>${esc(reset)}</em>` : ''}
+        </div>`;
+      }).join('');
     } else if (q.kind === 'balance') {
       right = `${q.currency === 'CNY' ? '¥' : '$'}${q.amount.toFixed(2)}`;
       tip = q.note || q.currency;
       if (q.amount <= view.plan.threshold) { urgent = true; rightCls = 'urgent'; }
     } else if (q.kind === 'fixed_quota') {
       right = `${q.used_percent.toFixed(0)}%`;
-      barPct = q.used_percent;
       urgent = isUrgent(q.used_percent);
-      tip = `已用 ${fmtNum(q.used)} / ${fmtNum(q.total)}`;
+      const u = q.used_percent;
+      lines = `
+        <div class="win-line ${isUrgent(u) ? 'urgent' : ''}">
+          <span>总额度</span>
+          <div class="bar slim ${isUrgent(u) ? 'urgent-fill' : ''}"><i data-w="${u.toFixed(1)}"></i></div>
+          <b>${u.toFixed(0)}%</b>
+        </div>`;
     }
   }
   if (urgent) rightCls = 'urgent';
 
-  const bar = barPct >= 0
-    ? `<div class="row-bar"><i data-w="${barPct.toFixed(1)}"></i></div>`
-    : '';
   const tipLine = tip ? `<div class="row-tip">${esc(tip)}</div>` : '';
   const actions = opts.actions || '';
   const logo = logoHtml(view);
 
   return `
-  <div class="row ${sub_cls(opts)} ${urgent ? 'row-urgent' : ''}" data-template="${esc(view.plan.template)}">
+  <div class="row ${opts.sub ? 'row-sub' : ''} ${urgent ? 'row-urgent' : ''}" data-template="${esc(view.plan.template)}">
     <div class="row-main">
       <div class="row-icon">${logo}</div>
       <div class="row-body">
@@ -204,16 +207,12 @@ function rowHtml(view, opts = {}) {
           <span class="row-name">${esc(view.plan.name)}${view.plan.enabled ? '' : ' <em class="row-off">已停用</em>'}</span>
           <span class="row-pct ${rightCls}">${esc(right)}</span>
         </div>
-        ${bar}${extra}
+        ${lines}
       </div>
       ${actions}
     </div>
     ${tipLine}
   </div>`;
-}
-
-function sub_cls(opts) {
-  return opts.sub ? 'row-sub' : '';
 }
 
 /** 主窗口行右侧控制区（套餐管理） */
@@ -244,6 +243,16 @@ function splitPopupViews(views, popupPlanIds, max) {
   }
   const rest = enabled.filter((v) => !picked.includes(v));
   return { primary: picked, rest };
+}
+
+/** 渲染后触发进度条从 0 → 目标值的填充动画（每次刷新都有生命感） */
+function animateBars(container) {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    container.querySelectorAll('.bar > i[data-w]').forEach((el) => {
+      el.style.width = el.dataset.w + '%';
+      el.removeAttribute('data-w');
+    });
+  }));
 }
 
 // ─── Toast（仅错误提示；规范禁止成功提示） ────────────────────
