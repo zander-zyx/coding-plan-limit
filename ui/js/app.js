@@ -49,7 +49,7 @@ function renderPlans() {
           <button class="txt-btn" data-edit="${v.plan.id}">编辑</button>
           <button class="txt-btn" data-del="${v.plan.id}">删除</button>
         </div>`;
-      return rowHtml(v, { lead, actions, hideHeadPct: true });
+      return rowHtml(v, { lead, actions });
     }).join('');
     animateBars(box);
 
@@ -76,12 +76,15 @@ function renderPlans() {
 async function togglePlan(id, enabled) {
   const view = state.views.find((v) => v.plan.id === id);
   if (!view) return;
+  view.plan.enabled = enabled;
   try {
-    await invoke('save_plan', { plan: { ...view.plan, enabled }, secret: null });
+    await invoke('save_plan', { plan: { ...view.plan }, secret: null });
+    // 静默切换：不 reload 不闪动；弹窗打开时自行拉最新
   } catch (e) {
+    view.plan.enabled = !enabled;
     toast(String(e));
+    await reload(); // 失败回滚 UI
   }
-  await reload();
 }
 
 async function removePlan(id) {

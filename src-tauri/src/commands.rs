@@ -54,22 +54,21 @@ pub fn save_plan(
     }
 
     // 模板变更时清掉旧模板的密钥（同认证类型不删，如 Kimi 余额 ↔ Coding Plan 切换）
-    if !is_new {
-        let old_tpl = store::load_plans(&app)
-            .iter()
-            .find(|p| p.id == plan.id)
-            .map(|p| p.template.clone());
-        if let Some(old) = old_tpl {
-            if old != plan.template {
-                let auth_of = |id: &str| {
-                    crate::usage::templates()
-                        .into_iter()
-                        .find(|t| t.id == id)
-                        .map(|t| t.auth)
-                };
-                if auth_of(&old) != auth_of(&plan.template) {
-                    store::delete_secret(&app, &plan.id);
-                }
+    let old_plan = if is_new {
+        None
+    } else {
+        store::load_plans(&app).into_iter().find(|p| p.id == plan.id)
+    };
+    if let Some(old) = &old_plan {
+        if old.template != plan.template {
+            let auth_of = |id: &str| {
+                crate::usage::templates()
+                    .into_iter()
+                    .find(|t| t.id == id)
+                    .map(|t| t.auth)
+            };
+            if auth_of(&old.template) != auth_of(&plan.template) {
+                store::delete_secret(&app, &plan.id);
             }
         }
     }
@@ -102,7 +101,19 @@ pub fn save_plan(
         }
     })?;
 
-    scheduler::request_refresh(&app);
+    // 仅启用状态变化（开关切换）→ 静默保存：不唤醒调度全量刷新、不广播。
+    // 前端开关已本地切换；弹窗打开时会自行 get_views 拉最新状态。
+    let only_toggle = old_plan.map_or(false, |old| {
+        let mut a = serde_json::to_value(&old).unwrap_or(serde_json::Value::Null);
+        let mut b = serde_json::to_value(&plan).unwrap_or(serde_json::Value::Null);
+        let enabled = b.get("enabled").cloned().unwrap_or(serde_json::Value::Null);
+        a["enabled"] = enabled.clone();
+        b["enabled"] = enabled;
+        a == b
+    });
+    if !only_toggle {
+        scheduler::request_refresh(&app);
+    }
     Ok(SavePlanOut {
         plan,
         warning: warnings.into_iter().next_back(),
