@@ -579,6 +579,11 @@ $('btn-update-side').addEventListener('click', () => {
   if (updateUrl) invoke('open_external', { url: updateUrl }).catch(() => {});
 });
 $('btn-check-update').addEventListener('click', async () => {
+  const btn = $('btn-check-update');
+  if (btn.disabled) return;
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '检查中…';
   try {
     const info = await invoke('check_update');
     if (info.error) {
@@ -586,10 +591,17 @@ $('btn-check-update').addEventListener('click', async () => {
     } else if (info.has_update) {
       showUpdateSide(info);
       invoke('open_external', { url: info.url }).catch(() => {});
+    } else {
+      // 已是最新：按钮短暂显示当前版本（规范禁止成功 toast，用按钮文案反馈）
+      btn.textContent = `已是最新 v${info.current}`;
+      setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 2500);
+      return;
     }
   } catch (e) {
     toast(String(e));
   }
+  btn.disabled = false;
+  btn.textContent = original;
 });
 
 $('btn-repo').addEventListener('click', () => {

@@ -174,9 +174,8 @@ html[data-theme='light'] .panel { background: rgba(250, 248, 245, 0.96); }
 .row-icon .card-logo { width: 14px; height: 14px; }
 .row-icon .tpl-glyph { width: 6px; height: 6px; border-radius: 2px; transform: rotate(45deg); }
 .card-logo.logo-broken { display: none; }
-/* Z.ai logo 保持官方原色黑，暗色主题反白保证可见 */
-html[data-theme='dark'] .card-logo[src$="icons/zai.svg"],
-html[data-theme='dark'] .t-logo[src$="icons/zai.svg"] {
+/* lobehub 单色 logo（m-*.svg）保持官方原色黑，暗色主题反白保证可见 */
+html[data-theme='dark'] :is(.card-logo, .t-logo)[src*="/m-"] {
   filter: invert(1);
 }
 

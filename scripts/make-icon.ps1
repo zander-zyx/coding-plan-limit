@@ -1,7 +1,8 @@
-# Center-crop source image to a 1024x1024 PNG (default app icon source).
+# Center-crop a source image to a 1024x1024 PNG (default app icon source).
+# Usage: powershell -File scripts/make-icon.ps1 -SourcePath <path-to-image>
 param(
-    [string]$SourcePath = 'REDACTED',
-    [string]$OutPath = 'E:\zander_project\coding-plan-limit\assets\icon-source.png'
+    [Parameter(Mandatory = $true)][string]$SourcePath,
+    [string]$OutPath = (Join-Path $PSScriptRoot '..\assets\icon-source.png')
 )
 Add-Type -AssemblyName System.Drawing
 if (-not (Test-Path $SourcePath)) { Write-Error "Source image not found: $SourcePath"; exit 1 }
