@@ -324,7 +324,7 @@ html[data-theme='dark'] .side { background: rgba(255, 255, 255, 0.02); }
   transition: opacity var(--tr);
   flex: none;
 }
-.row-lead { flex: none; margin-right: 4px; }
+.row-lead { flex: none; display: flex; align-items: center; gap: 2px; }
 .row-lead .row-actions { opacity: 0.85; }
 .row:hover .row-lead .row-actions, .row:hover .row-actions, .row:focus-within .row-actions { opacity: 1; }
 

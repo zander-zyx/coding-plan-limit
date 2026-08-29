@@ -12,7 +12,7 @@ const listen = Tauri.event.listen;
 const PROVIDER_META = {
   minimax:        { name: 'MiniMax',       color: '#ff5b4a', icon: 'icons/minimax.png', homepage: 'https://platform.minimaxi.com' },
   zhipu:          { name: '智谱 GLM',      color: '#3f7cff', icon: 'icons/zai.svg', homepage: 'https://open.bigmodel.cn' },
-  'kimi-coding':  { name: 'Kimi Coding',   color: '#16c8b7', icon: 'icons/kimi.png', homepage: 'https://www.kimi.com/coding' },
+  'kimi-coding':  { name: 'Kimi Coding',   color: '#16c8b7', icon: 'icons/kimi.png', homepage: 'https://www.kimi.com/code' },
   'claude-official': { name: 'Claude',     color: '#d97757', icon: 'icons/claude-official.png', homepage: 'https://claude.ai' },
   codex:          { name: 'Codex',         color: '#10a37f', icon: 'icons/codex.png', homepage: 'https://chatgpt.com' },
   'claude-cache': { name: 'Claude',        color: '#d97757', icon: 'icons/claude-cache.svg', homepage: 'https://claude.ai' },
@@ -215,8 +215,8 @@ function rowHtml(view, opts = {}) {
 
   return `
   <div class="row ${opts.sub ? 'row-sub' : ''} ${urgent ? 'row-urgent' : ''}" data-template="${esc(view.plan.template)}">
-    ${actions ? `<div class="row-lead">${actions}</div>` : ''}
     <div class="row-main">
+      ${actions ? `<div class="row-lead">${actions}</div>` : ''}
       <div class="row-icon">${logo}</div>
       <div class="row-body">
         <div class="row-top">

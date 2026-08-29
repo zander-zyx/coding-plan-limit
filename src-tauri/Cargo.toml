@@ -1,6 +1,6 @@
 [package]
 name = "coding-plan-limit"
-version = "0.3.4"
+version = "0.3.5"
 description = "聚合展示多个 Coding Plan / Token Plan 套餐剩余额度"
 edition = "2021"
 
