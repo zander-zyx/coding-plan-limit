@@ -84,7 +84,8 @@ input, select, textarea { font: inherit; color: var(--text-p); }
   from { opacity: 0; transform: scale(0.985) translateY(4px); }
   to { opacity: 1; transform: none; }
 }
-html[data-theme='light'] .panel { background: rgba(250, 248, 245, 0.86); }
+html[data-theme='dark'] .panel { background: rgba(17, 17, 28, 0.94); }
+html[data-theme='light'] .panel { background: rgba(250, 248, 245, 0.96); }
 
 .p-head {
   height: 32px;

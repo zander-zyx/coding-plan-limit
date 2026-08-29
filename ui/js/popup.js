@@ -9,54 +9,57 @@ let lastViews = [];
 let lastSettings = null;
 
 function render(views, settings) {
-  lastViews = views;
-  const s = settings || lastSettings;
-  if (!s) return;
-  lastSettings = s;
+  try {
+    lastViews = views;
+    const s = settings || lastSettings;
+    if (!s) return;
+    lastSettings = s;
 
-  const { primary, rest } = splitPopupViews(views, s.popup_plan_ids);
-  const enabled = views.filter((v) => v.plan.enabled);
+    const { primary, rest } = splitPopupViews(views, s.popup_plan_ids);
+    const enabled = views.filter((v) => v.plan.enabled);
 
-  if (!primary.length) {
-    list.innerHTML = `<div class="p-empty">暂无启用的套餐</div>`;
-    updatedEl.textContent = '—';
-    statusDot.className = 'status-dot ok';
-    return;
-  }
-
-  let html = primary.map((v) => rowHtml(v)).join('');
-  if (rest.length) {
-    html += `
-      <button class="more-toggle" id="btn-more">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="${moreOpen ? 'up' : ''}"><path d="m6 9 6 6 6-6"/></svg>
-        更多 ${rest.length}
-      </button>`;
-    if (moreOpen) {
-      html += `<div class="more-wrap">${rest.map((v) => rowHtml(v, { sub: true })).join('')}</div>`;
+    if (!primary.length) {
+      list.innerHTML = `<div class="p-empty">暂无启用的套餐</div>`;
+      updatedEl.textContent = '—';
+      statusDot.className = 'status-dot ok';
+      return;
     }
-  }
-  list.innerHTML = html;
-  animateBars(list);
-  list.querySelector('#btn-more')?.addEventListener('click', () => {
-    moreOpen = !moreOpen;
-    render(lastViews, lastSettings);
-  });
 
-  // 底部相对时间
-  const times = views.map((v) => v.snapshot && v.snapshot.updated_at).filter(Boolean);
-  updatedEl.textContent = times.length ? `Updated ${fmtAgo(Math.max(...times))}` : '—';
-
-  // 状态点：任一错误或紧急 → 琥珀脉冲；否则绿
-  const bad = enabled.some((v) => v.snapshot && !v.snapshot.ok)
-    || enabled.some((v) => {
-      const q = v.snapshot?.quota;
-      if (!q) return false;
-      if (q.kind === 'windows') return q.windows.some((w) => isUrgent(w.used_percent));
-      if (q.kind === 'fixed_quota') return isUrgent(q.used_percent);
-      if (q.kind === 'balance') return q.amount <= v.plan.threshold;
-      return false;
+    let html = primary.map((v) => rowHtml(v)).join('');
+    if (rest.length) {
+      html += `
+        <button class="more-toggle" id="btn-more">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="${moreOpen ? 'up' : ''}"><path d="m6 9 6 6 6-6"/></svg>
+          更多 ${rest.length}
+        </button>`;
+      if (moreOpen) {
+        html += `<div class="more-wrap">${rest.map((v) => rowHtml(v, { sub: true })).join('')}</div>`;
+      }
+    }
+    list.innerHTML = html;
+    animateBars(list);
+    list.querySelector('#btn-more')?.addEventListener('click', () => {
+      moreOpen = !moreOpen;
+      render(lastViews, lastSettings);
     });
-  statusDot.className = `status-dot ${bad ? 'warn' : 'ok'}`;
+
+    const times = views.map((v) => v.snapshot && v.snapshot.updated_at).filter(Boolean);
+    updatedEl.textContent = times.length ? `Updated ${fmtAgo(Math.max(...times))}` : '—';
+
+    const bad = enabled.some((v) => v.snapshot && !v.snapshot.ok)
+      || enabled.some((v) => {
+        const q = v.snapshot?.quota;
+        if (!q) return false;
+        if (q.kind === 'windows') return q.windows.some((w) => isUrgent(w.used_percent));
+        if (q.kind === 'fixed_quota') return isUrgent(q.used_percent);
+        if (q.kind === 'balance') return q.amount <= v.plan.threshold;
+        return false;
+      });
+    statusDot.className = `status-dot ${bad ? 'warn' : 'ok'}`;
+  } catch (e) {
+    list.innerHTML = `<div class="p-empty" style="color:var(--urgent)">渲染异常：${esc(String(e && e.message || e))}</div>`;
+    console.error('popup render failed:', e);
+  }
 }
 
 async function loadSettings() {
@@ -71,7 +74,8 @@ async function loadSettings() {
   try {
     render(await invoke('get_views'), lastSettings);
   } catch (e) {
-    list.innerHTML = `<div class="p-empty">加载失败</div>`;
+    list.innerHTML = `<div class="p-empty" style="color:var(--urgent)">加载失败：${esc(String(e && e.message || e))}</div>`;
+    console.error('popup load failed:', e);
   }
 
   await listen('views-updated', async (e) => {

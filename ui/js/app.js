@@ -25,49 +25,52 @@ document.querySelectorAll('.side nav button').forEach((btn) => {
 
 // ─── 套餐列表（行式，弹窗同构） ───────────────────────────────
 function renderPlans() {
-  const enabled = state.views.filter((v) => v.plan.enabled);
-  const bad = enabled.filter((v) => v.snapshot && !v.snapshot.ok).length;
-  $('plans-sub').textContent = state.views.length
-    ? `共 ${state.views.length} · 启用 ${enabled.length}${bad ? ` · 异常 ${bad}` : ''}`
-    : '尚未添加套餐';
+  try {
+    const enabled = state.views.filter((v) => v.plan.enabled);
+    const bad = enabled.filter((v) => v.snapshot && !v.snapshot.ok).length;
+    $('plans-sub').textContent = state.views.length
+      ? `共 ${state.views.length} · 启用 ${enabled.length}${bad ? ` · 异常 ${bad}` : ''}`
+      : '尚未添加套餐';
 
-  const box = $('plan-list');
-  if (!state.views.length) {
-    box.innerHTML = `<div class="p-empty" style="padding:80px 0">点击右上角「添加套餐」开始</div>`;
-    return;
+    const box = $('plan-list');
+    if (!state.views.length) {
+      box.innerHTML = `<div class="p-empty" style="padding:80px 0">点击右上角「添加套餐」开始</div>`;
+      return;
+    }
+    box.innerHTML = state.views.map((v) => {
+      const lead = `
+        <div class="row-lead">
+          <label class="switch sm" title="启用/停用">
+            <input type="checkbox" data-toggle="${v.plan.id}" ${v.plan.enabled ? 'checked' : ''} /><i></i>
+          </label>
+        </div>`;
+      const actions = `
+        <div class="row-actions">
+          <button class="txt-btn" data-edit="${v.plan.id}">编辑</button>
+          <button class="txt-btn" data-del="${v.plan.id}">删除</button>
+        </div>`;
+      return rowHtml(v, { lead, actions, hideHeadPct: true });
+    }).join('');
+    animateBars(box);
+
+    box.querySelectorAll('.row-tip').forEach((el) => { el.style.display = 'block'; });
+    setupDrag(box);
+
+    box.querySelectorAll('[data-toggle]').forEach((el) =>
+      el.addEventListener('change', () => togglePlan(el.dataset.toggle, el.checked)));
+    box.querySelectorAll('[data-edit]').forEach((el) =>
+      el.addEventListener('click', () => openModal(el.dataset.edit)));
+    box.querySelectorAll('[data-del]').forEach((el) =>
+      el.addEventListener('click', () => {
+        if (el.dataset.armed) { removePlan(el.dataset.del); return; }
+        el.dataset.armed = '1';
+        el.textContent = '确认删除';
+        setTimeout(() => { el.dataset.armed = ''; el.textContent = '删除'; }, 2500);
+      }));
+  } catch (e) {
+    $('plan-list').innerHTML = `<div class="p-empty" style="color:var(--urgent)">列表渲染异常：${esc(String(e && e.message || e))}</div>`;
+    console.error('renderPlans failed:', e);
   }
-  box.innerHTML = state.views.map((v) => {
-    const lead = `
-      <div class="row-lead">
-        <label class="switch sm" title="启用/停用">
-          <input type="checkbox" data-toggle="${v.plan.id}" ${v.plan.enabled ? 'checked' : ''} /><i></i>
-        </label>
-      </div>`;
-    const actions = `
-      <div class="row-actions">
-        <button class="txt-btn" data-edit="${v.plan.id}">编辑</button>
-        <button class="txt-btn" data-del="${v.plan.id}">删除</button>
-      </div>`;
-    return rowHtml(v, { lead, actions, hideHeadPct: true });
-  }).join('');
-  animateBars(box);
-
-  // 展开行内已隐藏的详情（主窗口直接可见明细，不依赖 hover）
-  box.querySelectorAll('.row-tip').forEach((el) => { el.style.display = 'block'; });
-  setupDrag(box);
-
-  box.querySelectorAll('[data-toggle]').forEach((el) =>
-    el.addEventListener('change', () => togglePlan(el.dataset.toggle, el.checked)));
-  box.querySelectorAll('[data-edit]').forEach((el) =>
-    el.addEventListener('click', () => openModal(el.dataset.edit)));
-  box.querySelectorAll('[data-del]').forEach((el) =>
-    el.addEventListener('click', () => {
-      // 两步删除替代确认对话框
-      if (el.dataset.armed) { removePlan(el.dataset.del); return; }
-      el.dataset.armed = '1';
-      el.textContent = '确认删除';
-      setTimeout(() => { el.dataset.armed = ''; el.textContent = '删除'; }, 2500);
-    }));
 }
 
 async function togglePlan(id, enabled) {
@@ -565,11 +568,18 @@ $('btn-repo').addEventListener('click', () => {
 
 // ─── 数据加载与初始化 ─────────────────────────────────────────
 async function reload() {
-  state.views = await invoke('get_views');
-  state.settings = await invoke('get_settings');
-  renderPlans();
-  renderSettings();
-  renderSideLogo();
+  try {
+    state.views = await invoke('get_views');
+    state.settings = await invoke('get_settings');
+    renderPlans();
+    renderSettings();
+    renderSideLogo();
+  } catch (e) {
+    // 异常显形：不静默吞掉
+    const box = $('plan-list');
+    if (box) box.innerHTML = `<div class="p-empty" style="color:var(--urgent)">渲染异常：${esc(String(e && e.message || e))}</div>`;
+    console.error('reload failed:', e);
+  }
 }
 
 function renderSideLogo() {
