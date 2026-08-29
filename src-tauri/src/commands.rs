@@ -227,6 +227,12 @@ pub fn set_popup_hover(app: AppHandle, active: bool) {
     }
 }
 
+/// 弹窗内容高度变化后由前端调用：按最近托盘区域重新定位（保持底部锚定托盘）
+#[tauri::command]
+pub fn popup_size_changed(app: AppHandle) {
+    tray::position_popup(&app);
+}
+
 /// 用系统浏览器打开链接（弹窗点击套餐卡片跳转官网 / About 页仓库链接）
 #[tauri::command]
 pub fn open_external(app: AppHandle, url: String) -> Result<(), String> {

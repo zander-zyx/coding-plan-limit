@@ -2,6 +2,7 @@
 //! Windows：悬停即显示；macOS / Linux：左键点击切换（系统托盘 API 不支持悬停事件）。
 
 use std::sync::atomic::Ordering;
+use std::sync::Mutex;
 use std::time::Duration;
 
 use tauri::menu::{Menu, MenuItem};
@@ -10,6 +11,9 @@ use tauri::{AppHandle, Manager, Rect};
 
 use crate::scheduler;
 use crate::state::HIDE_GEN;
+
+/// 最近一次托盘图标区域 (x, y, w, h)（物理像素），供弹窗高度变化后重新定位
+pub static LAST_TRAY_RECT: Mutex<Option<(f64, f64, f64, f64)>> = Mutex::new(None);
 
 /// 屏幕底部安全边距（Windows 任务栏高度 ~48px，留余量）
 const TASKBAR_SAFE: f64 = 64.0;
@@ -157,10 +161,40 @@ pub fn show_popup_at(app: &AppHandle, rect: Rect) {
     let Some(win) = app.get_webview_window("popup") else {
         return;
     };
+
+    // 记住托盘区域：弹窗内容高度变化后（popup_size_changed）按它重新定位
+    *LAST_TRAY_RECT.lock().unwrap() = Some(rect_xywh(&rect));
+
+    position_popup(app);
+    let _ = win.show();
+
+    // 打开弹窗：数据 60s 内刷新过就只重推视图，否则强制刷新一轮（互斥防并发）
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let stale = {
+            let state = app.state::<crate::state::AppState>();
+            crate::usage::types::now_secs() - state.last_refresh.load(Ordering::Relaxed)
+                > POPUP_REFRESH_THROTTLE
+        };
+        if stale {
+            scheduler::refresh_all(&app).await;
+        } else {
+            scheduler::emit_views(&app).await;
+        }
+    });
+}
+
+/// 按最近托盘区域重新定位弹窗（底部锚定托盘上方，收拢进屏幕工作区）
+pub fn position_popup(app: &AppHandle) {
+    let Some((rx, ry, rw, rh)) = *LAST_TRAY_RECT.lock().unwrap() else {
+        return;
+    };
+    let Some(win) = app.get_webview_window("popup") else {
+        return;
+    };
     let size = win.outer_size().unwrap_or_default();
     let (w, h) = (size.width as f64, size.height as f64);
 
-    let (rx, ry, rw, rh) = rect_xywh(&rect);
     let mut x = rx + rw / 2.0 - w / 2.0;
     let mut y = ry - h - 12.0;
     if y < 8.0 {
@@ -184,22 +218,6 @@ pub fn show_popup_at(app: &AppHandle, rect: Rect) {
     let _ = win.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
         x as i32, y as i32,
     )));
-    let _ = win.show();
-
-    // 打开弹窗：数据 60s 内刷新过就只重推视图，否则强制刷新一轮（互斥防并发）
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        let stale = {
-            let state = app.state::<crate::state::AppState>();
-            crate::usage::types::now_secs() - state.last_refresh.load(Ordering::Relaxed)
-                > POPUP_REFRESH_THROTTLE
-        };
-        if stale {
-            scheduler::refresh_all(&app).await;
-        } else {
-            scheduler::emit_views(&app).await;
-        }
-    });
 }
 
 /// 延迟隐藏弹窗：到时用"光标是否在弹窗附近"判定（JS mouseleave 在快速移出时

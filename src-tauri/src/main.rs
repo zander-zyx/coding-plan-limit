@@ -45,6 +45,7 @@ fn main() {
             commands::open_main,
             commands::hide_popup,
             commands::set_popup_hover,
+            commands::popup_size_changed,
             commands::quit_app,
             commands::set_custom_icon,
             commands::reset_custom_icon,

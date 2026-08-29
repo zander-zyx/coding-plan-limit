@@ -8,6 +8,21 @@ let moreOpen = false;
 let lastViews = [];
 let lastSettings = null;
 
+// 弹窗高度跟随内容：收起时按显示行数自适应、展开"更多"后拉长；
+// setSize 后请后端按托盘位置重新定位（保持底部锚定），超出上限则列表内部滚动
+async function fitWindow() {
+  try {
+    const panel = document.querySelector('.panel');
+    panel.style.height = 'auto';
+    const h = Math.ceil(document.body.scrollHeight);
+    panel.style.height = '';
+    const capped = Math.min(Math.max(h, 120), 680);
+    await window.__TAURI__.window.getCurrentWindow()
+      .setSize(new window.__TAURI__.dpi.LogicalSize(280, capped));
+    invoke('popup_size_changed').catch(() => {});
+  } catch { /* 无窗口 API 的环境（如浏览器预览）静默 */ }
+}
+
 function render(views, settings) {
   try {
     lastViews = views;
@@ -22,6 +37,7 @@ function render(views, settings) {
       list.innerHTML = `<div class="p-empty">暂无启用的套餐</div>`;
       updatedEl.textContent = '—';
       statusDot.className = 'status-dot ok';
+      fitWindow();
       return;
     }
 
@@ -56,6 +72,7 @@ function render(views, settings) {
         return false;
       });
     statusDot.className = `status-dot ${bad ? 'warn' : 'ok'}`;
+    fitWindow();
   } catch (e) {
     list.innerHTML = `<div class="p-empty" style="color:var(--urgent)">渲染异常：${esc(String(e && e.message || e))}</div>`;
     console.error('popup render failed:', e);

@@ -1,0 +1,23 @@
+<svg width="1024" height="1024" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Plan Limit logo · 环中 Z（张亦修 ZYX）· 深底 + 270° 额度环 + 分段斜线 Z，中段与端点用默认主题紫 #8B6CFF -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#232130"/>
+      <stop offset="1" stop-color="#141219"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <rect x="10" y="10" width="492" height="492" rx="108" fill="none" stroke="#FFFFFF" stroke-opacity="0.07" stroke-width="2"/>
+  <!-- 额度环：底环 25% 用量灰 + 270° 白弧 + 紫色进度头（与弹窗用量环同构） -->
+  <circle cx="256" cy="256" r="182" fill="none" stroke="#FFFFFF" stroke-opacity="0.13" stroke-width="30"/>
+  <path d="M 256 74 A 182 182 0 1 1 74 256" fill="none" stroke="#F4F3F8" stroke-width="30" stroke-linecap="round"/>
+  <circle cx="74" cy="256" r="26" fill="#8B6CFF"/>
+  <!-- Z（张）：斜线三段式额度条，中段紫 -->
+  <g transform="translate(256,256) scale(0.58) translate(-256,-256)">
+    <rect x="118" y="116" width="276" height="66" fill="#F4F3F8"/>
+    <rect x="118" y="330" width="276" height="66" fill="#F4F3F8"/>
+    <polygon points="328,182 394,182 337,222 271,222" fill="#F4F3F8"/>
+    <polygon points="249,238 314,238 263,274 197,274" fill="#8B6CFF"/>
+    <polygon points="175,290 241,290 184,330 118,330" fill="#F4F3F8"/>
+  </g>
+</svg>
