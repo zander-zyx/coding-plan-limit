@@ -32,7 +32,6 @@ pub struct NotifyRecord {
 }
 
 /// 弹窗 / 托盘悬停激活标记：任一为 true 时取消自动隐藏
-pub static HOVER_ACTIVE: AtomicBool = AtomicBool::new(false);
 /// 隐藏任务代号：每次调度递增，执行前比对，旧任务作废
 pub static HIDE_GEN: AtomicU64 = AtomicU64::new(0);
 /// 主窗口页面加载完成后是否需要显示（仅首次使用/无套餐时为 true）

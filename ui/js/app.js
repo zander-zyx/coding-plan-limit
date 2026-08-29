@@ -196,6 +196,10 @@ function renderFormFields() {
   if (!t) return;
   const editing = state.editingId && state.views.find((v) => v.plan.id === state.editingId);
   state.pendingLogo = editing ? (editing.plan.logo || null) : null;
+  // 切换模板/变体时保留用户已输入但未保存的内容
+  const keepName = $('f-name').value;
+  const keepThreshold = $('f-threshold').value;
+  const keepBaseUrl = $('f-baseurl').value;
 
   $('f-region-item').hidden = !t.has_region;
   $('f-kimi-variant-item').hidden = state.selectedTpl !== 'kimi';
@@ -221,10 +225,10 @@ function renderFormFields() {
       : '任一窗口剩余百分比低于该值时触发系统通知';
 
   if (editing) {
-    $('f-name').value = editing.plan.name;
+    $('f-name').value = keepName || editing.plan.name;
     $('f-region').value = editing.plan.region || 'cn';
-    $('f-baseurl').value = editing.plan.base_url || '';
-    $('f-threshold').value = editing.plan.threshold;
+    $('f-baseurl').value = keepBaseUrl || editing.plan.base_url || '';
+    $('f-threshold').value = keepThreshold || editing.plan.threshold;
     $('f-enabled').checked = editing.plan.enabled;
     const ph = '已配置，留空保持不变';
     $('f-bearer').placeholder = ph;
@@ -233,10 +237,10 @@ function renderFormFields() {
     $('f-ak-id').placeholder = ph;
     $('f-ak-secret').placeholder = ph;
   } else {
-    $('f-name').value = shortLabel(t.id);
+    $('f-name').value = keepName || shortLabel(t.id);
     $('f-region').value = 'cn';
-    $('f-baseurl').value = '';
-    $('f-threshold').value = 10;
+    $('f-baseurl').value = keepBaseUrl;
+    $('f-threshold').value = keepThreshold || 10;
     $('f-enabled').checked = true;
     ['f-bearer', 'f-cookie', 'f-cookie-key', 'f-ak-id', 'f-ak-secret'].forEach((id) => ($(id).placeholder = ''));
   }
@@ -352,7 +356,11 @@ $('btn-save').addEventListener('click', async () => {
     template: t.id,
     name: $('f-name').value.trim(),
     enabled: $('f-enabled').checked,
-    threshold: parseFloat($('f-threshold').value) || 0,
+    threshold: (() => {
+      const raw = parseFloat($('f-threshold').value);
+      if (!Number.isFinite(raw)) return t.quota_type === 'balance' ? 0 : 10;
+      return t.quota_type === 'balance' ? Math.max(0, raw) : Math.min(100, Math.max(0, raw));
+    })(),
     region: t.has_region ? $('f-region').value : 'cn',
     base_url: t.needs_base_url ? $('f-baseurl').value.trim() || null : null,
     logo: state.pendingLogo || null,
@@ -508,7 +516,7 @@ $('accent-picker').addEventListener('change', (e) => {
   }
 });
 $('accent-hex').addEventListener('change', (e) => {
-  const v = e.target.value.trim();
+  const v = e.target.value.trim().replace(/^#?([0-9a-fA-F]{6})$/, '#$1');
   if (/^#[0-9a-fA-F]{6}$/.test(v)) {
     saveSettings({ accent: v }).then(renderSettings);
   } else {

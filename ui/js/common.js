@@ -58,8 +58,8 @@ function hexToHue(hex) {
 
 /** 用户选色 → 提取 Hue 写入 --brand-hue，全站配色自动派生 */
 function applyAccent(hex) {
-  if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return;
-  document.documentElement.style.setProperty('--brand-hue', String(hexToHue(hex)));
+  const ok = hex && /^#[0-9a-fA-F]{6}$/.test(hex);
+  document.documentElement.style.setProperty('--brand-hue', ok ? String(hexToHue(hex)) : '252');
 }
 
 function applySettingsLook(s) {
@@ -168,12 +168,13 @@ function rowHtml(view, opts = {}) {
       const wins = [...q.windows].sort((a, b) => winPriority(a) - winPriority(b));
       const worst = wins.reduce((a, w) => Math.max(a, w.used_percent), 0);
       // 窗口明细已含百分比，行头不再重复显示
-      urgent = isUrgent(worst);
+      urgent = isUrgent(worst)
+        || wins.some((w) => 100 - w.used_percent <= (view.plan.threshold ?? 0));
       // 每个窗口一行：标签 + 进度条 + 百分比 + 重置时刻（09-24 01:02）
       lines = wins.map((w) => {
         const u = w.used_percent;
         const reset = w.reset_at ? resetAtText(w.reset_at) : '';
-        const urgentLine = isUrgent(u) ? 'urgent' : '';
+        const urgentLine = isUrgent(u) || (100 - u <= (view.plan.threshold ?? 0)) ? 'urgent' : '';
         return `
         <div class="win-line ${urgentLine}">
           <span>${esc(w.label)}</span>
@@ -229,17 +230,6 @@ function rowHtml(view, opts = {}) {
   </div>`;
 }
 
-/** 主窗口行右侧控制区（套餐管理） */
-function rowActionsHtml(view) {
-  return `
-  <div class="row-actions">
-    <label class="switch" title="启用/停用">
-      <input type="checkbox" data-toggle="${view.plan.id}" ${view.plan.enabled ? 'checked' : ''} /><i></i>
-    </label>
-    <button class="txt-btn" data-edit="${view.plan.id}">编辑</button>
-    <button class="txt-btn danger" data-del="${view.plan.id}">删除</button>
-  </div>`;
-}
 
 // ─── 弹窗视图拆分：未选择时默认固定 3 家；选了 N 家展示 N 家（≤10） ──
 function splitPopupViews(views, popupPlanIds, max) {

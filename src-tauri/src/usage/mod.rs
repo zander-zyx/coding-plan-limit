@@ -150,7 +150,7 @@ pub fn templates() -> Vec<Template> {
         Template {
             id: "packycode".into(),
             name: "PackyCode".into(),
-            description: "余额查询（OpenAI 兼容计费接口）".into(),
+            description: "余额（币种跟随站点后台显示设置）".into(),
             auth: "bearer".into(),
             quota_type: "balance".into(),
             has_region: false,
@@ -160,7 +160,7 @@ pub fn templates() -> Vec<Template> {
         Template {
             id: "newapi".into(),
             name: "NewAPI / OneAPI 站点".into(),
-            description: "需填写站点地址，走 OpenAI 兼容计费接口".into(),
+            description: "填站点地址；币种跟随站点后台设置".into(),
             auth: "bearer".into(),
             quota_type: "balance".into(),
             has_region: false,

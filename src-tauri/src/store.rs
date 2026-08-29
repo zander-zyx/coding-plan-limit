@@ -54,12 +54,38 @@ pub fn snapshots_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 
 // ─── 读写 ─────────────────────────────────────────────────────────────────
 
+/// 区分"文件不存在（给默认）"与"存在但损坏（中止写入保护数据）"
+enum LoadOutcome {
+    Loaded(Config),
+    Missing,
+    Corrupt(String),
+}
+
+fn load_config_full(app: &tauri::AppHandle) -> LoadOutcome {
+    let path = match config_path(app) {
+        Ok(p) => p,
+        Err(_) => return LoadOutcome::Missing,
+    };
+    match fs::read_to_string(&path) {
+        Ok(s) => match serde_json::from_str(&s) {
+            Ok(c) => LoadOutcome::Loaded(c),
+            Err(e) => {
+                // 损坏文件备份，便于用户手工恢复
+                let _ = fs::copy(&path, path.with_extension("corrupt.bak"));
+                LoadOutcome::Corrupt(e.to_string())
+            }
+        },
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => LoadOutcome::Missing,
+        Err(e) => LoadOutcome::Corrupt(e.to_string()),
+    }
+}
+
 pub fn load_config(app: &tauri::AppHandle) -> Config {
-    config_path(app)
-        .ok()
-        .and_then(|p| fs::read_to_string(p).ok())
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_default()
+    match load_config_full(app) {
+        LoadOutcome::Loaded(c) => c,
+        // 读取失败（权限等）与损坏同样返回默认，但 update_config 会拒绝写入，防覆盖
+        _ => Config::default(),
+    }
 }
 
 /// 私有写入（调用方需已持有 WRITE_LOCK）
@@ -68,15 +94,26 @@ fn write_config_unlocked(app: &tauri::AppHandle, config: &Config) -> Result<(), 
     atomic_write(&path, &serde_json::to_string_pretty(config).map_err(|e| e.to_string())?)
 }
 
-/// 加锁执行一次"读-改-写"，消除并发保存互相覆盖
+/// 加锁执行一次"读-改-写"，消除并发保存互相覆盖。
+/// 配置损坏时中止写入（备份为 config.corrupt.bak），绝不把空配置写回。
 pub fn update_config<F>(app: &tauri::AppHandle, f: F) -> Result<(), String>
 where
     F: FnOnce(&mut Config),
 {
-    let _guard = WRITE_LOCK.lock().map_err(|_| "配置写入锁异常")?;
-    let mut config = load_config(app);
+    let guard = WRITE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut config = match load_config_full(app) {
+        LoadOutcome::Loaded(c) => c,
+        LoadOutcome::Missing => Config::default(),
+        LoadOutcome::Corrupt(e) => {
+            return Err(format!(
+                "配置文件已损坏（备份为 config.corrupt.bak），为保护数据已中止写入: {e}"
+            ));
+        }
+    };
     f(&mut config);
-    write_config_unlocked(app, &config)
+    let result = write_config_unlocked(app, &config);
+    drop(guard);
+    result
 }
 
 pub fn load_plans(app: &tauri::AppHandle) -> Vec<PlanConfig> {
@@ -158,7 +195,13 @@ pub fn save_secret(
     }
     match keyring_entry(&entry_user(plan_id, suffix)) {
         Ok(entry) => match entry.set_password(value) {
-            Ok(()) => return Ok(None),
+            Ok(()) => {
+                // 密钥已入凭据库，清理历史降级明文（如有）
+                let _ = update_config(app, |c| {
+                    c.fallback_secrets.remove(&format!("{plan_id}:{suffix}"));
+                });
+                return Ok(None);
+            }
             Err(e) => {
                 let warn = format!("系统凭据库写入失败（{e}），密钥将明文保存在本地配置文件中");
                 persist_fallback(app, plan_id, suffix, value)?;

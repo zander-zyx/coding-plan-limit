@@ -7,7 +7,7 @@ use std::time::Duration;
 use futures::future::join_all;
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::state::{AppState, NotifyRecord, HOVER_ACTIVE};
+use crate::state::{AppState, NotifyRecord};
 use crate::store;
 use crate::usage::types::{NotifyMode, PlanConfig, PlanView, Quota, Snapshot};
 use crate::usage;
@@ -64,9 +64,23 @@ pub async fn refresh_all(app: &AppHandle) {
     });
     let snapshots: Vec<Snapshot> = join_all(futs).await;
 
+    // 查询期间套餐可能被删除：以最新 plans 为准过滤（防孤儿快照复活 + 已删套餐误通知）
+    let live: std::collections::HashSet<String> =
+        store::load_plans(app).iter().map(|p| p.id.clone()).collect();
+    let enabled: Vec<PlanConfig> =
+        enabled.into_iter().filter(|p| live.contains(&p.id)).collect();
+    let snapshots: Vec<Snapshot> = snapshots
+        .into_iter()
+        .filter(|s| live.contains(&s.plan_id))
+        .collect();
+
     {
         let state = app.state::<AppState>();
         let mut map = state.snapshots.lock().await;
+        // 空套餐时不整体清空（删除走 delete_plan 的清理），防误读空配置时连快照一起抹掉
+        if !plans.is_empty() {
+            map.retain(|k, _| live.contains(k));
+        }
         for snap in &snapshots {
             map.insert(snap.plan_id.clone(), snap.clone());
         }
@@ -77,12 +91,12 @@ pub async fn refresh_all(app: &AppHandle) {
 
     let merged = {
         let mut map = store::load_snapshots(app);
+        if !plans.is_empty() {
+            map.retain(|k, _| live.contains(k));
+        }
         for s in &snapshots {
             map.insert(s.plan_id.clone(), s.clone());
         }
-        // 只保留仍存在的套餐（删除竞态下不复活孤儿快照）
-        let live: Vec<&str> = plans.iter().map(|p| p.id.as_str()).collect();
-        map.retain(|k, _| live.contains(&k.as_str()));
         map
     };
     store::save_snapshots(app, &merged);
@@ -270,7 +284,3 @@ fn human_delta(unix_secs: i64) -> Option<String> {
     }
 }
 
-/// 供托盘模块读写悬停标记
-pub fn set_hover(active: bool) {
-    HOVER_ACTIVE.store(active, Ordering::Relaxed);
-}

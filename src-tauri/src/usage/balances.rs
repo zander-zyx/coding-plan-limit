@@ -4,33 +4,50 @@
 use super::http::{f64_of, get_json, str_of};
 use super::types::Quota;
 
-fn balance(amount: f64, note: Option<String>) -> Quota {
+fn balance(amount: f64, currency: &str, note: Option<String>) -> Quota {
     Quota::Balance {
         amount,
-        currency: "CNY".into(),
+        currency: currency.to_string(),
         note,
     }
 }
 
-/// DeepSeek 账户余额
+/// DeepSeek 账户余额：balance_infos 按币种多条，优先 CNY 条目，币种透传
 pub async fn deepseek(bearer: &str) -> Result<Quota, String> {
     let json = get_json(
         "https://api.deepseek.com/user/balance",
         &[("Authorization", format!("Bearer {bearer}"))],
     )
     .await?;
-    let info = json
-        .pointer("/balance_infos/0")
+    let infos = json
+        .get("balance_infos")
+        .and_then(|v| v.as_array())
         .ok_or("响应缺少 balance_infos")?;
+    let info = infos
+        .iter()
+        .find(|i| str_of(i, "currency") == Some("CNY"))
+        .or_else(|| infos.first())
+        .ok_or("balance_infos 为空")?;
     let total = f64_of(info, "total_balance").ok_or("缺少 total_balance")?;
+    let currency = str_of(info, "currency").unwrap_or("CNY").to_string();
     let note = match (
         f64_of(info, "topped_up_balance"),
         f64_of(info, "granted_balance"),
     ) {
-        (Some(t), Some(g)) => Some(format!("充值 ¥{t:.2} · 赠送 ¥{g:.2}")),
+        (Some(t), Some(g)) => {
+            Some(format!("充值 {}{t:.2} · 赠送 {}{g:.2}", symbol_of(&currency), currency))
+        }
         _ => None,
     };
-    Ok(balance(total, note))
+    Ok(balance(total, &currency, note))
+}
+
+fn symbol_of(currency: &str) -> &'static str {
+    match currency {
+        "CNY" => "¥",
+        "USD" => "$",
+        _ => "",
+    }
 }
 
 /// Kimi / Moonshot 账户余额
@@ -48,7 +65,7 @@ pub async fn kimi(region: &str, bearer: &str) -> Result<Quota, String> {
         .or_else(|| f64_of(d, "total_balance"))
         .ok_or("响应中无余额字段")?;
     let note = f64_of(d, "granted_balance").map(|g| format!("赠送 ¥{g:.2}"));
-    Ok(balance(avail, note))
+    Ok(balance(avail, if region == "intl" { "USD" } else { "CNY" }, note))
 }
 
 /// 阶跃星辰 StepFun 账户余额
@@ -69,7 +86,7 @@ pub async fn stepfun(region: &str, bearer: &str) -> Result<Quota, String> {
         (Some(c), Some(v)) => Some(format!("现金 ¥{c:.2} · 代金券 ¥{v:.2}")),
         _ => None,
     };
-    Ok(balance(bal, note))
+    Ok(balance(bal, if region == "intl" { "USD" } else { "CNY" }, note))
 }
 
 /// 硅基流动 SiliconFlow 账户余额（totalBalance 为准，balance 字段有负值 bug）
@@ -85,5 +102,5 @@ pub async fn siliconflow(region: &str, bearer: &str) -> Result<Quota, String> {
     let total = f64_of(d, "totalBalance").ok_or("响应中无 totalBalance 字段")?;
     let note = f64_of(d, "balance").map(|b| format!("充值 ¥{b:.2}"));
     let _ = str_of(d, "id"); // 保持字段引用完整性
-    Ok(balance(total, note))
+    Ok(balance(total, if region == "intl" { "USD" } else { "CNY" }, note))
 }

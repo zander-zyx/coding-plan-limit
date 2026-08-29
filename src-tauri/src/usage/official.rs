@@ -75,11 +75,15 @@ pub async fn claude() -> Result<Quota, String> {
     let json = super::http::get_json(
         "https://api.anthropic.com/api/oauth/usage",
         &[
-            ("Authorization", format!("Bearer {token}")),
+            ("Authorization", format!("Bearer {token}"),
+            ),
             ("anthropic-beta", "oauth-2025-04-20".into()),
         ],
     )
-    .await?;
+    .await
+    .map_err(|e| {
+        if e.contains("401") { format!("Claude 凭据已过期，请重新 claude login（{e}）") } else { e }
+    })?;
 
     let mut windows = Vec::new();
     for key in ["five_hour", "seven_day", "seven_day_opus", "seven_day_sonnet"] {
@@ -87,11 +91,16 @@ pub async fn claude() -> Result<Quota, String> {
         let Some(util) = w.get("utilization").and_then(|v| v.as_f64()) else {
             continue;
         };
+        // opus/sonnet 子限额独立标签，避免与主 7天 窗口同名坍缩
+        let label = match key {
+            "five_hour" => "5小时".to_string(),
+            "seven_day" => "7天".to_string(),
+            "seven_day_opus" => "7天 Opus".to_string(),
+            "seven_day_sonnet" => "7天 Sonnet".to_string(),
+            _ => key.to_string(),
+        };
         windows.push(WindowQuota {
-            label: window_label(match key {
-                "five_hour" => Some(18_000),
-                _ => Some(604_800),
-            }),
+            label,
             used_percent: util.clamp(0.0, 100.0),
             reset_at: parse_reset(w.get("resets_at")),
         });
@@ -151,7 +160,11 @@ pub async fn codex() -> Result<Quota, String> {
     if let Some(id) = account {
         headers.push(("ChatGPT-Account-Id", id));
     }
-    let json = super::http::get_json("https://chatgpt.com/backend-api/wham/usage", &headers).await?;
+    let json = super::http::get_json("https://chatgpt.com/backend-api/wham/usage", &headers)
+        .await
+        .map_err(|e| {
+            if e.contains("401") { format!("Codex 凭据已过期，请重新 codex login（{e}）") } else { e }
+        })?;
 
     let mut windows = Vec::new();
     let limit = json.get("rate_limit");

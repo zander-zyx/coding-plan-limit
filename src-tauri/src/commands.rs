@@ -53,6 +53,23 @@ pub fn save_plan(
         return Err("套餐名称不能为空".into());
     }
 
+    plan.name = plan.name.trim().chars().take(50).collect();
+
+    // 阈值夹紧：窗口/固定额度型 0-100，余额型 >=0；非法输入回默认 10
+    if !plan.threshold.is_finite() {
+        plan.threshold = 10.0;
+    }
+    let quota_type = crate::usage::templates()
+        .into_iter()
+        .find(|t| t.id == plan.template)
+        .map(|t| t.quota_type)
+        .unwrap_or_default();
+    plan.threshold = if quota_type == "balance" {
+        plan.threshold.max(0.0)
+    } else {
+        plan.threshold.clamp(0.0, 100.0)
+    };
+
     // 模板变更时清掉旧模板的密钥（同认证类型不删，如 Kimi 余额 ↔ Coding Plan 切换）
     let old_plan = if is_new {
         None
@@ -205,7 +222,6 @@ pub fn hide_popup(app: AppHandle) {
 /// 弹窗 JS 上报鼠标进入/离开（悬停状态判定，防止移入弹窗时被自动隐藏）
 #[tauri::command]
 pub fn set_popup_hover(app: AppHandle, active: bool) {
-    scheduler::set_hover(active);
     if !active {
         tray::schedule_hide(&app);
     }

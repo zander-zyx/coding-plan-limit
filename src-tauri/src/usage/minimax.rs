@@ -22,13 +22,14 @@ pub async fn query(region: &str, bearer: &str) -> Result<Quota, String> {
         .and_then(|v| v.as_array())
         .ok_or("响应缺少 model_remains")?;
     if list.is_empty() {
-        return Err("model_remains 为空".into());
+        return Err("暂不支持：model_remains 为空".into());
     }
-    // 与原逻辑一致：优先 general（Coding Plan 默认模型），否则第一条
+    // 优先 general（Coding Plan 默认模型）；无 general 时不猜（避免把 video 等
+    // 非编程模型额度当套餐展示）
     let main = list
         .iter()
         .find(|m| m.get("model_name").and_then(|v| v.as_str()) == Some("general"))
-        .unwrap_or_else(|| &list[0]);
+        .ok_or("暂不支持：响应中无 general 模型额度")?;
 
     let mut windows = Vec::new();
     let mut push = |label: &str, remain_key: &str, reset_key: &str| {
@@ -41,7 +42,13 @@ pub async fn query(region: &str, bearer: &str) -> Result<Quota, String> {
         }
     };
     push("5小时", "current_interval_remaining_percent", "end_time");
-    push("7天", "current_weekly_remaining_percent", "weekly_end_time");
+    // 周窗口仅在激活时展示（current_weekly_status==1）；无周限额套餐该字段恒为
+    // remaining 100，不门控会出现幻影"7天 0%"
+    let weekly_active =
+        main.get("current_weekly_status").and_then(|v| v.as_i64()) == Some(1);
+    if weekly_active {
+        push("7天", "current_weekly_remaining_percent", "weekly_end_time");
+    }
     push("本月", "current_monthly_remaining_percent", "monthly_end_time");
 
     if windows.is_empty() {

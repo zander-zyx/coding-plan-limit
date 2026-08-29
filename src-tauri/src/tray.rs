@@ -68,11 +68,9 @@ pub fn create(app: &tauri::App) -> tauri::Result<()> {
             match event {
                 // Windows 悬停显示
                 TrayIconEvent::Enter { rect, .. } => {
-                    scheduler::set_hover(true);
                     show_popup_at(app, rect.clone());
                 }
                 TrayIconEvent::Leave { .. } => {
-                    scheduler::set_hover(false);
                     schedule_hide(app);
                 }
                 // macOS / Linux 点击切换（Windows 由 Enter 悬停驱动，
@@ -90,8 +88,7 @@ pub fn create(app: &tauri::App) -> tauri::Result<()> {
                         if popup.is_visible().unwrap_or(false) {
                             let _ = popup.hide();
                         } else {
-                            scheduler::set_hover(true);
-                            show_popup_at(app, rect.clone());
+                                    show_popup_at(app, rect.clone());
                         }
                     }
                 }
@@ -206,10 +203,10 @@ pub fn show_popup_at(app: &AppHandle, rect: Rect) {
 }
 
 /// 延迟隐藏弹窗：到时用"光标是否在弹窗附近"判定（JS mouseleave 在快速移出时
-/// 可能不触发，导致 HOVER 标记卡死——光标判定是唯一可靠事实源）。
-/// 光标在弹窗附近（含从托盘移向弹窗的途中）则保持显示，由后续 Leave 再调度。
+/// 可能不派发，光标判定是唯一可靠事实源）。
+/// 光标仍在弹窗附近 → 原地重排一轮复检（不依赖 JS 事件兜底）；
+/// 光标已离开 → 隐藏。
 pub fn schedule_hide(app: &AppHandle) {
-    scheduler::set_hover(false);
     let gen = HIDE_GEN.fetch_add(1, Ordering::Relaxed) + 1;
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
@@ -221,18 +218,19 @@ pub fn schedule_hide(app: &AppHandle) {
         if !win.is_visible().unwrap_or(false) {
             return;
         }
-        // 光标在弹窗附近 → 保持显示，等待下一次 Leave 重新调度
         if let (Ok(cursor), Ok(pos), Ok(size)) =
             (app.cursor_position(), win.outer_position(), win.outer_size())
         {
             let (cx, cy) = (cursor.x, cursor.y);
             let (x, y) = (pos.x as f64, pos.y as f64);
             let (w, h) = (size.width as f64, size.height as f64);
-            if cx >= x - HIDE_MARGIN
+            let near = cx >= x - HIDE_MARGIN
                 && cx <= x + w + HIDE_MARGIN
                 && cy >= y - HIDE_MARGIN
-                && cy <= y + h + HIDE_MARGIN
-            {
+                && cy <= y + h + HIDE_MARGIN;
+            if near {
+                // 仍在弹窗附近（含从托盘移向弹窗途中）：重排一轮复检
+                schedule_hide(&app);
                 return;
             }
         }
