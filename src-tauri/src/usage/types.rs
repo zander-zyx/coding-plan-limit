@@ -156,7 +156,7 @@ pub struct Settings {
     /// 主题：system | light | dark
     #[serde(default = "default_theme")]
     pub theme: String,
-    /// 悬浮弹窗固定展示的套餐 id（最多 2 个，按顺序展示；其余收进"更多"）
+    /// 悬浮弹窗固定展示的套餐 id（1-10 家，按顺序展示；其余收进"更多"）
     #[serde(default)]
     pub popup_plan_ids: Vec<String>,
     /// 自定义主题色（#RRGGBB；None = 默认蓝）

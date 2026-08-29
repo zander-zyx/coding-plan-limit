@@ -41,7 +41,7 @@ _systemDark.addEventListener('change', () => {
   }
 });
 
-/** Kimi 规范：Hue 落在 260–280° 时吸附到官方 Kimi 紫 #7c5cff（hue≈257） */
+/** Kimi 规范：Hue 落在 260–280° 时吸附到官方 Kimi 紫 #7c5cff（hue≈252） */
 function hexToHue(hex) {
   const n = parseInt(hex.slice(1), 16);
   const r = ((n >> 16) & 0xff) / 255, g = ((n >> 8) & 0xff) / 255, b = (n & 0xff) / 255;
@@ -151,7 +151,7 @@ function winPriority(w) {
 
 function rowHtml(view, opts = {}) {
   const snap = view.snapshot;
-  let right = '—';
+  let right = '';
   let rightCls = '';
   let barPct = -1;
   let tip = '';
@@ -159,6 +159,7 @@ function rowHtml(view, opts = {}) {
   let lines = '';
 
   if (!snap || !snap.ok) {
+    right = '—';
     tip = snap && snap.error ? String(snap.error) : '尚未获取数据';
     if (tip.startsWith('暂不支持')) tip = '暂无窗口额度数据';
   } else {
@@ -166,8 +167,7 @@ function rowHtml(view, opts = {}) {
     if (q.kind === 'windows') {
       const wins = [...q.windows].sort((a, b) => winPriority(a) - winPriority(b));
       const worst = wins.reduce((a, w) => Math.max(a, w.used_percent), 0);
-      // 主窗口模式：汇总大数字多余（窗口行里已有），只在弹窗显示
-      if (!opts.hideHeadPct) right = `${worst.toFixed(worst < 10 ? 1 : 0)}%`;
+      // 窗口明细已含百分比，行头不再重复显示
       urgent = isUrgent(worst);
       // 每个窗口一行：标签 + 进度条 + 百分比 + 重置时刻（09-24 01:02）
       lines = wins.map((w) => {
@@ -177,26 +177,23 @@ function rowHtml(view, opts = {}) {
         return `
         <div class="win-line ${urgentLine}">
           <span>${esc(w.label)}</span>
-          <div class="bar slim ${urgentLine}"><i data-w="${u.toFixed(1)}"></i></div>
+          <div class="bar slim ${urgentLine ? 'urgent-fill' : ''}"><i data-w="${u.toFixed(1)}"></i></div>
           <b>${u.toFixed(u < 10 ? 1 : 0)}%</b>
           ${reset ? `<em>${esc(reset)}</em>` : ''}
         </div>`;
       }).join('');
     } else if (q.kind === 'balance') {
-      if (!opts.hideHeadPct) right = `${q.currency === 'CNY' ? '¥' : '$'}${q.amount.toFixed(2)}`;
-      // 余额明细也走 win-line 结构，与窗口行左对齐（标签列留空）
+      right = `${q.currency === 'CNY' ? '¥' : '$'}${q.amount.toFixed(2)}`;
+      // 余额明细走 win-line 结构与窗口行对齐（无 note 时不渲染多余行）
       if (q.note) {
         lines = `
         <div class="win-line">
           <span>明细</span>
           <em style="flex:1;text-align:left">${esc(q.note)}</em>
         </div>`;
-      } else {
-        tip = q.currency;
       }
       if (q.amount <= view.plan.threshold) { urgent = true; rightCls = 'urgent'; }
     } else if (q.kind === 'fixed_quota') {
-      if (!opts.hideHeadPct) right = `${q.used_percent.toFixed(0)}%`;
       urgent = isUrgent(q.used_percent);
       const u = q.used_percent;
       lines = `
@@ -222,7 +219,7 @@ function rowHtml(view, opts = {}) {
       <div class="row-body">
         <div class="row-top">
           <span class="row-name">${esc(view.plan.name)}${view.plan.enabled ? '' : ' <em class="row-off">已停用</em>'}</span>
-          <span class="row-pct ${rightCls}">${esc(right)}</span>
+          ${right ? `<span class="row-pct ${rightCls}">${esc(right)}</span>` : ''}
         </div>
         ${lines}
       </div>

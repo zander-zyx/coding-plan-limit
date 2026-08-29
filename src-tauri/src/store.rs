@@ -94,25 +94,32 @@ fn keyring_entry(plan_id: &str) -> Result<keyring::Entry, String> {
         .map_err(|e| format!("凭据库不可用: {e}"))
 }
 
-/// 读密钥：凭据库优先，兜底配置文件
+/// 读密钥：凭据库优先，兜底配置文件。
+/// 按模板注册表的 auth 类型分发，新增模板不再需要改这里。
 pub fn load_credential(app: &tauri::AppHandle, plan: &PlanConfig) -> crate::usage::Credential {
+    use crate::usage;
     let config = load_config(app);
     let mut cred = crate::usage::Credential::default();
 
     let take = |s: Option<String>| s.filter(|v| !v.is_empty());
+    let auth = usage::templates()
+        .into_iter()
+        .find(|t| t.id == plan.template)
+        .map(|t| t.auth)
+        .unwrap_or_default();
 
-    // 单密钥模板：凭据库一条 set_password
-    if matches!(
-        plan.template.as_str(),
-        "minimax" | "zhipu" | "kimi-coding" | "deepseek" | "kimi" | "stepfun" | "siliconflow"
-    ) {
-        cred.bearer = take(read_secret(app, &config, &plan.id, "key"));
-    } else if plan.template == "xiaomi" {
-        cred.cookie = take(read_secret(app, &config, &plan.id, "cookie"));
-        cred.bearer = take(read_secret(app, &config, &plan.id, "key"));
-    } else if plan.template == "alibaba" {
-        cred.ak_id = take(read_secret(app, &config, &plan.id, "ak_id"));
-        cred.ak_secret = take(read_secret(app, &config, &plan.id, "ak_secret"));
+    match auth.as_str() {
+        "bearer" => cred.bearer = take(read_secret(app, &config, &plan.id, "key")),
+        "cookie" => {
+            cred.cookie = take(read_secret(app, &config, &plan.id, "cookie"));
+            cred.bearer = take(read_secret(app, &config, &plan.id, "key"));
+        }
+        "bss" => {
+            cred.ak_id = take(read_secret(app, &config, &plan.id, "ak_id"));
+            cred.ak_secret = take(read_secret(app, &config, &plan.id, "ak_secret"));
+        }
+        // none：无需密钥（claude-official/codex 读本机 CLI 凭据）
+        _ => {}
     }
     cred
 }

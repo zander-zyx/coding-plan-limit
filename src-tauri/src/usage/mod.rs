@@ -211,18 +211,23 @@ pub async fn query(plan: &PlanConfig, cred: &Credential) -> Result<Quota, String
             )
             .await
         }
-        // NewAPI 系（OpenAI 兼容计费接口）：必须提供站点地址
+        // NewAPI 系（OpenAI 兼容计费接口）
         "packycode" | "newapi" | "sub2api" => {
-            let base = plan
-                .base_url
-                .as_deref()
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .ok_or("请在套餐配置中填写站点 API 地址")?;
-            if plan.template == "packycode" && base.eq_ignore_ascii_case("default") {
+            let base = match plan.template.as_str() {
                 // packycode 未填地址时使用官方默认
-                return newapi::query("https://www.packyapi.ai", require(cred.bearer.as_deref(), "API Key")?).await;
-            }
+                "packycode" => plan
+                    .base_url
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("default"))
+                    .unwrap_or("https://www.packyapi.ai"),
+                _ => plan
+                    .base_url
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .ok_or("请在套餐配置中填写站点 API 地址")?,
+            };
             newapi::query(base, require(cred.bearer.as_deref(), "API Key")?).await
         }
         other => Err(format!("未知模板: {other}")),

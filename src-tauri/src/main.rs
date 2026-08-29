@@ -102,12 +102,11 @@ fn main() {
             // 启动 8 秒后首查 + 每 24 小时后台无感检查更新
             update::start_auto_check(app.handle().clone());
 
-            // 首次使用（还没有套餐）直接打开主窗口，否则静默驻留托盘
-            if store::load_plans(app.handle()).is_empty() {
-                if let Some(win) = app.get_webview_window("main") {
-                    let _ = win.show();
-                }
-            }
+            // 首次使用（还没有套餐）在页面加载完成后显示主窗口，否则静默驻留托盘
+            state::SHOW_MAIN_ON_LOAD.store(
+                store::load_plans(app.handle()).is_empty(),
+                std::sync::atomic::Ordering::Relaxed,
+            );
             Ok(())
         })
         .on_window_event(|window, event| match event {
@@ -119,9 +118,10 @@ fn main() {
             _ => {}
         })
         .on_page_load(|webview, payload| {
-            // 主窗口页面渲染完成后再显示，避免白屏闪烁
+            // 页面渲染完成后按需显示（消费一次性标志，避免每次加载都弹出）
             if payload.event() == tauri::webview::PageLoadEvent::Finished
                 && webview.label() == "main"
+                && state::SHOW_MAIN_ON_LOAD.swap(false, std::sync::atomic::Ordering::Relaxed)
             {
                 if let Some(win) = webview.app_handle().get_webview_window("main") {
                     let _ = win.show();

@@ -35,3 +35,5 @@ pub struct NotifyRecord {
 pub static HOVER_ACTIVE: AtomicBool = AtomicBool::new(false);
 /// 隐藏任务代号：每次调度递增，执行前比对，旧任务作废
 pub static HIDE_GEN: AtomicU64 = AtomicU64::new(0);
+/// 主窗口页面加载完成后是否需要显示（仅首次使用/无套餐时为 true）
+pub static SHOW_MAIN_ON_LOAD: AtomicBool = AtomicBool::new(false);

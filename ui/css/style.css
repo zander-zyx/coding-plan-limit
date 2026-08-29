@@ -7,7 +7,7 @@
    ============================================================ */
 
 :root {
-  --brand-hue: 262;
+  --brand-hue: 252;
   --brand: hsl(var(--brand-hue), 65%, 55%);
   --brand-dim: hsl(var(--brand-hue), 60%, 45%);
   --brand-glow: hsl(var(--brand-hue), 70%, 65%);

@@ -80,6 +80,9 @@ pub async fn refresh_all(app: &AppHandle) {
         for s in &snapshots {
             map.insert(s.plan_id.clone(), s.clone());
         }
+        // 只保留仍存在的套餐（删除竞态下不复活孤儿快照）
+        let live: Vec<&str> = plans.iter().map(|p| p.id.as_str()).collect();
+        map.retain(|k, _| live.contains(&k.as_str()));
         map
     };
     store::save_snapshots(app, &merged);

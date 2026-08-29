@@ -75,13 +75,17 @@ pub fn create(app: &tauri::App) -> tauri::Result<()> {
                     scheduler::set_hover(false);
                     schedule_hide(app);
                 }
-                // macOS / Linux 点击切换
+                // macOS / Linux 点击切换（Windows 由 Enter 悬停驱动，
+                // 点击会派发 Click 造成 显示→隐藏 闪烁，忽略）
                 TrayIconEvent::Click {
                     button: MouseButton::Left,
                     button_state: MouseButtonState::Up,
                     rect,
                     ..
                 } => {
+                    if cfg!(windows) {
+                        return;
+                    }
                     if let Some(popup) = app.get_webview_window("popup") {
                         if popup.is_visible().unwrap_or(false) {
                             let _ = popup.hide();

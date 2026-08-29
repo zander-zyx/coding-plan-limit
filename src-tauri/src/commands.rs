@@ -53,7 +53,7 @@ pub fn save_plan(
         return Err("套餐名称不能为空".into());
     }
 
-    // 模板变更时清掉旧模板的密钥（避免凭据库残留孤儿条目）
+    // 模板变更时清掉旧模板的密钥（同认证类型不删，如 Kimi 余额 ↔ Coding Plan 切换）
     if !is_new {
         let old_tpl = store::load_plans(&app)
             .iter()
@@ -61,7 +61,15 @@ pub fn save_plan(
             .map(|p| p.template.clone());
         if let Some(old) = old_tpl {
             if old != plan.template {
-                store::delete_secret(&app, &plan.id);
+                let auth_of = |id: &str| {
+                    crate::usage::templates()
+                        .into_iter()
+                        .find(|t| t.id == id)
+                        .map(|t| t.auth)
+                };
+                if auth_of(&old) != auth_of(&plan.template) {
+                    store::delete_secret(&app, &plan.id);
+                }
             }
         }
     }
@@ -84,11 +92,14 @@ pub fn save_plan(
         }
     }
 
-    // 密钥写入之后再加锁更新套餐列表（避免旧快照覆盖刚写入的兜底密钥）
+    // 密钥写入之后再加锁更新套餐列表（避免旧快照覆盖刚写入的兜底密钥）。
+    // 已存在的套餐原位替换（保留拖拽顺序），仅新增时追加。
     store::update_config(&app, |config| {
-        config.plans.retain(|p| p.id != plan.id);
-        config.plans.push(plan.clone());
-        config.plans.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        if let Some(slot) = config.plans.iter_mut().find(|p| p.id == plan.id) {
+            *slot = plan.clone();
+        } else {
+            config.plans.push(plan.clone());
+        }
     })?;
 
     scheduler::request_refresh(&app);
@@ -105,10 +116,13 @@ pub fn delete_plan(app: AppHandle, id: String) -> Result<(), String> {
     })?;
     store::delete_secret(&app, &id);
 
-    // 清理内存快照 + 磁盘快照缓存
+    // 清理内存快照/通知记录 + 磁盘快照缓存
     {
         if let Ok(mut map) = app.state::<AppState>().snapshots.try_lock() {
             map.remove(&id);
+        }
+        if let Ok(mut notified) = app.state::<AppState>().notified.try_lock() {
+            notified.remove(&id);
         }
     }
     let mut disk = store::load_snapshots(&app);
@@ -137,6 +151,7 @@ pub fn get_settings(app: AppHandle) -> Settings {
 
 #[tauri::command]
 pub fn save_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
+    let old_refresh = store::load_settings(&app).refresh_seconds;
     store::update_config(&app, |config| {
         config.settings = settings;
     })?;
@@ -157,8 +172,10 @@ pub fn save_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
     let latest = store::load_settings(&app);
     let _ = tauri::Emitter::emit(&app, "settings-updated", &latest);
 
-    // 让调度循环立即按新间隔工作
-    scheduler::request_refresh(&app);
+    // 仅刷新间隔变化时才需要唤醒调度循环（避免改主题色也触发全量 API 刷新）
+    if store::load_settings(&app).refresh_seconds != old_refresh {
+        scheduler::request_refresh(&app);
+    }
     Ok(())
 }
 

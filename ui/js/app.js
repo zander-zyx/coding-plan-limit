@@ -96,11 +96,14 @@ async function removePlan(id) {
 // ─── 拖拽排序（原生 HTML5 drag；顺序持久化并决定弹窗补足顺序） ──
 function setupDrag(box) {
   let dragId = null;
-  box.querySelectorAll('.row').forEach((row) => {
+  let dragFromIdx = -1;
+  box.querySelectorAll('.row').forEach((row, idx) => {
+    row.dataset.idx = String(idx);
     row.setAttribute('draggable', 'true');
     row.addEventListener('dragstart', (e) => {
       dragId = row.querySelector('[data-toggle]')?.dataset.toggle
         || row.querySelector('[data-edit]')?.dataset.edit;
+      dragFromIdx = idx;
       row.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', dragId || '');
@@ -121,16 +124,22 @@ function setupDrag(box) {
     row.addEventListener('drop', async (e) => {
       e.preventDefault();
       row.classList.remove('drag-over');
+      const dragRow = box.querySelector('.row.dragging');
       const overId = row.querySelector('[data-toggle]')?.dataset.toggle
         || row.querySelector('[data-edit]')?.dataset.edit;
-      if (!dragId || !overId || dragId === overId) { dragId = null; return; }
-      // 以 DOM 当前顺序为准重组
-      box.insertBefore(box.querySelector('.row.dragging'), dragId && overId ? row : null);
+      if (!dragId || !overId || dragId === overId || !dragRow) { dragId = null; return; }
+      // 向下拖 → 放到目标之后；向上拖 → 放到目标之前
+      if (dragFromIdx >= 0 && idx > dragFromIdx) {
+        row.after(dragRow);
+      } else {
+        box.insertBefore(dragRow, row);
+      }
       const ids = [...box.querySelectorAll('.row')]
         .map((r) => r.querySelector('[data-toggle]')?.dataset.toggle
           || r.querySelector('[data-edit]')?.dataset.edit)
         .filter(Boolean);
       dragId = null;
+      dragFromIdx = -1;
       try {
         await invoke('reorder_plans', { ids });
       } catch (err) {
@@ -365,6 +374,16 @@ $('btn-save').addEventListener('click', async () => {
 
 $('btn-delete').addEventListener('click', async () => {
   if (!state.editingId) return;
+  // 两步确认，与列表行删除一致
+  const b = $('btn-delete');
+  if (!b.dataset.armed) {
+    b.dataset.armed = '1';
+    b.textContent = '确认删除';
+    setTimeout(() => { b.dataset.armed = ''; b.textContent = '删除'; }, 2500);
+    return;
+  }
+  b.dataset.armed = '';
+  b.textContent = '删除';
   const id = state.editingId;
   closeModal();
   await removePlan(id);
@@ -610,6 +629,8 @@ function renderSideLogo() {
   await reload();
 
   await listen('views-updated', async (e) => {
+    // 拖拽进行中跳过重渲染（重建 DOM 会中断 drop）
+    if (document.querySelector('#plan-list .row.dragging')) return;
     state.views = e.payload || [];
     renderPlans();
   });

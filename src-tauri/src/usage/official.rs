@@ -23,15 +23,16 @@ fn home_path(rel: &[&str]) -> Option<std::path::PathBuf> {
 /// resets_at 兼容 unix 秒 / 毫秒 / ISO8601 字符串
 fn parse_reset(v: Option<&Value>) -> Option<i64> {
     let v = v?;
+    let secs = |n: i64| if n > 10_000_000_000 { n / 1000 } else { n };
     if let Some(n) = v.as_i64() {
-        return Some(if n > 10_000_000_000 { n / 1000 } else { n });
+        return Some(secs(n));
     }
     if let Some(n) = v.as_f64() {
-        return Some((n / 1000.0) as i64);
+        return Some(secs(n as i64));
     }
     let s = v.as_str()?;
     if let Ok(ts) = s.parse::<i64>() {
-        return Some(if ts > 10_000_000_000 { ts / 1000 } else { ts });
+        return Some(secs(ts));
     }
     // ISO8601
     time::OffsetDateTime::parse(s, &time::format_description::well_known::Rfc3339)
