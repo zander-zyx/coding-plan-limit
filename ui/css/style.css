@@ -408,9 +408,26 @@ input:focus, textarea:focus, select:focus {
 }
 input[type='number'] { width: 84px; text-align: center; font-variant-numeric: tabular-nums; }
 input[type='color'] {
-  width: 36px; padding: 2px;
-  background: var(--surface); cursor: pointer;
+  width: 20px; height: 20px;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  overflow: hidden;
 }
+input[type='color']::-webkit-color-swatch-wrapper { padding: 0; }
+input[type='color']::-webkit-color-swatch { border: none; border-radius: 5px; }
+input[type='color']:hover { border-color: var(--brand); }
+.accent-swatch {
+  width: 20px; height: 20px;
+  border-radius: 6px;
+  border: none;
+  padding: 0;
+  transition: transform var(--tr), box-shadow var(--tr);
+}
+.accent-swatch:hover { transform: scale(1.12); }
+.accent-swatch.active { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--brand); }
 .hex-input {
   width: 84px !important;
   text-align: center;

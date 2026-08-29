@@ -87,10 +87,19 @@ async function removePlan(id) {
 }
 
 // ─── 添加/编辑弹层 ────────────────────────────────────────────
+// 品牌短名（模板卡与默认套餐名）
+const SHORT_LABEL = {
+  minimax: 'MiniMax', zhipu: '智谱GLM', 'kimi-coding': 'Kimi', 'claude-official': 'Claude',
+  codex: 'Codex', 'claude-cache': 'Claude 缓存', xiaomi: '小米', deepseek: 'DeepSeek',
+  kimi: 'Kimi', stepfun: '阶跃', siliconflow: '硅基流动', alibaba: '阿里云',
+  packycode: 'PackyCode', newapi: 'NewAPI', sub2api: 'Sub2API',
+};
+const shortLabel = (id) => SHORT_LABEL[id] || (PROVIDER_META[id] || {}).name || id;
+
 function renderTplGrid() {
   $('tpl-grid').innerHTML = state.templates.filter((t) => t.id !== 'kimi-coding').map((t) => {
     const m = PROVIDER_META[t.id] || { color: '#8b93a7', icon: '' };
-    const label = t.id === 'kimi' ? 'Kimi' : t.name;
+    const label = shortLabel(t.id);
     const glyph = m.icon
       ? `<img class="t-logo" src="${esc(m.icon)}" alt="" />`
       : `<i style="background:${m.color};width:7px;height:7px;border-radius:2px;transform:rotate(45deg);flex:none"></i>`;
@@ -157,7 +166,7 @@ function renderFormFields() {
     $('f-ak-id').placeholder = ph;
     $('f-ak-secret').placeholder = ph;
   } else {
-    $('f-name').value = t.name;
+    $('f-name').value = shortLabel(t.id);
     $('f-region').value = 'cn';
     $('f-baseurl').value = '';
     $('f-threshold').value = 10;
@@ -315,7 +324,7 @@ function renderSettings() {
     b.classList.toggle('active', b.dataset.v === (s.theme || 'system')));
 
   $('accent-presets').innerHTML = state.accentPresets
-    .map((c) => `<button data-c="${c}" style="width:20px;height:20px;border-radius:6px;background:${c}" title="${c}"></button>`)
+    .map((c) => `<button class="accent-swatch ${((s.accent || '').toLowerCase() === c.toLowerCase()) ? 'active' : ''}" data-c="${c}" style="background:${c}" title="${c}"></button>`)
     .join('');
   $('accent-presets').querySelectorAll('[data-c]').forEach((b) =>
     b.addEventListener('click', () => saveSettings({ accent: b.dataset.c })));
