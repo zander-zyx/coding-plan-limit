@@ -284,6 +284,9 @@ pub fn get_config_dir(app: AppHandle) -> Result<String, String> {
 /// 内置单色 Logo（白色标记 + 透明底，适配深色任务栏）
 pub static LOGO_MONO: &[u8] = include_bytes!("../../ui/icons/logo-mono.png");
 
+/// 内置 Logo Mark（用户设计的 Z 标，128px）
+pub static LOGO_MARK: &[u8] = include_bytes!("../../ui/icons/app-mark.png");
+
 /// 前端把用户选择的图片画成 PNG dataURL 后提交；Rust 解码并实时更换托盘图标
 #[tauri::command]
 pub fn set_custom_icon(app: AppHandle, data_url: String) -> Result<(), String> {
@@ -322,6 +325,14 @@ pub fn set_logo_style(app: AppHandle, style: String) -> Result<(), String> {
             apply_tray_icon(&app, default_icon.clone());
             if let Some(win) = app.get_webview_window("main") {
                 let _ = win.set_icon(default_icon);
+            }
+        }
+        "mark" => {
+            let img = tauri::image::Image::from_bytes(LOGO_MARK)
+                .map_err(|e| format!("Logo Mark 解析失败: {e}"))?;
+            apply_tray_icon(&app, img.clone());
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.set_icon(img);
             }
         }
         "mono" => {

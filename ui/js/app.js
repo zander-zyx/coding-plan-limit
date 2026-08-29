@@ -649,7 +649,7 @@ function renderSideLogo() {
       img.className = 'side-logo-img';
       logo.prepend(img);
     }
-    img.src = custom || 'icons/logo-mono.png';
+    img.src = custom || (state.settings?.logo_style === 'mark' ? 'icons/app-mark.png' : 'icons/logo-mono.png');
   } else {
     dot.style.display = '';
     img?.remove();
