@@ -24,14 +24,14 @@ function inside(shape, x, y) {
     return x >= shape.x && x <= shape.x + shape.w && y >= shape.y && y <= shape.y + shape.h;
   }
   if (shape.type === 'round') {
-    // 圆角矩形 SDF
+    // 圆角矩形 SDF（iq 标准式：q = |p-c| - (half - r)，sdf = len(max(q,0)) + min(max(q),0) - r）
     const r = shape.r;
     const cx = shape.x + shape.w / 2, cy = shape.y + shape.h / 2;
     const hw = shape.w / 2 - r, hh = shape.h / 2 - r;
-    const dx = Math.abs(x - cx) - hw;
-    const dy = Math.abs(y - cy) - hh;
-    const ox = Math.max(dx, 0), oy = Math.max(dy, 0);
-    return Math.hypot(ox, oy) + Math.min(Math.max(dx, dy), 0) <= 0;
+    const qx = Math.abs(x - cx) - hw;
+    const qy = Math.abs(y - cy) - hh;
+    const ox = Math.max(qx, 0), oy = Math.max(qy, 0);
+    return Math.hypot(ox, oy) + Math.min(Math.max(qx, qy), 0) - r <= 0;
   }
   const p = shape.pts;
   let sign = 0;
@@ -133,7 +133,7 @@ console.log('渲染圆角底版…');
 const tile = render(SHAPES_TILE);
 fs.writeFileSync('assets/logo-mark-tile-1024.png', encodePNG(tile, OUT, OUT));
 
-// 256px 应用版（箱式下采样）
+// 256px 应用版（箱式下采样）——用圆角底版：透明版白 Z 在浅色任务栏/托盘上不可见
 console.log('生成 256px 应用版…');
 const small = new Uint8Array(256 * 256 * 4);
 const f = 4;
@@ -143,7 +143,7 @@ for (let y = 0; y < 256; y++) {
     for (let sy = 0; sy < f; sy++) {
       for (let sx = 0; sx < f; sx++) {
         const o = ((y * f + sy) * OUT + (x * f + sx)) * 4;
-        r += alpha[o]; g += alpha[o + 1]; b += alpha[o + 2]; a += alpha[o + 3];
+        r += tile[o]; g += tile[o + 1]; b += tile[o + 2]; a += tile[o + 3];
       }
     }
     const n = f * f, o2 = (y * 256 + x) * 4;

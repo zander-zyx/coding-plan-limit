@@ -9,6 +9,7 @@
 <body>
   <div class="panel">
     <header class="p-head">
+      <img id="popup-logo" class="p-logo" alt="" hidden />
       <span id="status-dot" class="status-dot ok" title="关闭"></span>
       <div class="head-actions">
         <button id="btn-update" class="p-icon-btn" title="发现新版本" hidden>
@@ -22,6 +23,8 @@
     <main id="list" class="p-list"></main>
     <footer class="p-foot"><span id="updated">…</span></footer>
   </div>
+  <script src="vendor/gsap.min.js"></script>
+  <script src="js/motion.js"></script>
   <script src="js/common.js"></script>
   <script src="js/popup.js"></script>
 </body>

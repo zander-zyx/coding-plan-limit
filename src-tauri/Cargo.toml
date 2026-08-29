@@ -1,6 +1,6 @@
 [package]
 name = "coding-plan-limit"
-version = "0.3.17"
+version = "0.3.18"
 description = "聚合展示多个 Coding Plan / Token Plan 套餐剩余额度"
 edition = "2021"
 
@@ -26,7 +26,7 @@ base64 = "0.22"
 time = { version = "0.3", features = ["formatting", "parsing"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.60", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_Graphics_Dwm"] }
+windows-sys = { version = "0.60", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_Graphics_Dwm", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi", "Win32_UI_Shell_PropertiesSystem", "Win32_System_Com_StructuredStorage", "Win32_System_Variant"] }
 
 [profile.release]
 strip = true

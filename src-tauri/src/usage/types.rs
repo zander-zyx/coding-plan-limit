@@ -171,7 +171,7 @@ pub struct Settings {
     /// 自定义托盘图标（PNG dataURL；None = 使用内置默认图标）
     #[serde(default)]
     pub custom_icon: Option<String>,
-    /// Logo 样式：color（原色，默认）| mono（单色白，适配深色任务栏）；custom_icon 存在时按 custom 处理
+    /// Logo 样式：color（原色，默认）| mark（Z 标）| custom（应用 custom_icon 图片）；custom_icon 与样式选择独立存档
     #[serde(default = "default_logo_style")]
     pub logo_style: String,
 }

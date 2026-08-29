@@ -281,11 +281,343 @@ pub fn get_config_dir(app: AppHandle) -> Result<String, String> {
 
 // ─── Logo（托盘 / 主窗口 / 侧边栏同步） ────────────────────────────────────
 
-/// 内置单色 Logo（白色标记 + 透明底，适配深色任务栏）
-pub static LOGO_MONO: &[u8] = include_bytes!("../../ui/icons/logo-mono.png");
-
-/// 内置 Logo Mark（用户设计的 Z 标，128px）
+/// 内置 Logo Mark（用户设计的 Z 标，256px 深色圆角底）
 pub static LOGO_MARK: &[u8] = include_bytes!("../../ui/icons/app-mark.png");
+
+/// PNG dataURL → 解码为图像
+fn decode_data_url_png(data_url: &str) -> Option<tauri::image::Image<'static>> {
+    data_url
+        .strip_prefix("data:image/png;base64,")
+        .and_then(|payload| {
+            base64::Engine::decode(&base64::engine::general_purpose::STANDARD, payload).ok()
+        })
+        .and_then(|raw| tauri::image::Image::from_bytes(&raw[..]).ok())
+}
+
+/// 按当前设置解析应使用的 Logo 图（custom 图 / Mark；None = 默认原色）
+pub fn resolve_saved_logo(app: &AppHandle) -> Option<tauri::image::Image<'static>> {
+    let settings = store::load_settings(app);
+    let style = settings.logo_style.clone();
+    let custom = settings.custom_icon.clone();
+    let img = match style.as_str() {
+        "custom" => custom.as_deref().and_then(decode_data_url_png),
+        "mark" => tauri::image::Image::from_bytes(LOGO_MARK).ok(),
+        _ => None,
+    };
+    if img.is_none() && style != "color" {
+        debug_log(app, &format!("resolve_logo: style={style} 解析失败，回落默认"));
+    }
+    img
+}
+
+/// 图标链路诊断日志（配置目录 icon-debug.log）：托盘/任务栏图标问题排查用
+pub fn debug_log(app: &AppHandle, msg: &str) {
+    use std::io::Write as _;
+    let Ok(dir) = store::config_dir(app) else { return };
+    let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join("icon-debug.log"))
+    else {
+        return;
+    };
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let _ = writeln!(f, "[{ts}] {msg}");
+}
+
+/// Windows 原生窗口图标：Win11 任务栏按钮在创建时读取窗口类图标，且不随
+/// WM_SETICON 刷新（表现为"标题栏已变、按钮仍旧图"）。因此对类图标
+/// （SetClassLongPtrW）与窗口图标（WM_SETICON）双通道同设。
+#[cfg(windows)]
+mod win_icon {
+    use windows_sys::Win32::Foundation::{HWND, PROPERTYKEY};
+    use windows_sys::Win32::Graphics::Gdi::{
+        CreateDIBSection, DeleteObject, GetDC, ReleaseDC, BITMAPINFO, BITMAPINFOHEADER,
+    };
+    use windows_sys::Win32::System::Com::StructuredStorage::{
+        PROPVARIANT, PROPVARIANT_0_0, PROPVARIANT_0_0_0,
+    };
+    use windows_sys::Win32::UI::Shell::PropertiesSystem::SHGetPropertyStoreForWindow;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        CreateIconIndirect, GetSystemMetrics, SendMessageW, SetClassLongPtrW, SetPropW, GCLP_HICON,
+        GCLP_HICONSM, HICON, ICONINFO, ICON_BIG, ICON_SMALL, SM_CXICON, SM_CXSMICON, SM_CYICON,
+        SM_CYSMICON, WM_SETICON,
+    };
+
+    /// 窗口级 AUMID：与开始菜单快捷方式（其图标 = exe 内嵌图标）脱钩，
+    /// 任务栏按钮回落为窗口图标（类图标已设为当前 Logo）。实测移除快捷方式后
+    /// 按钮立即跟随窗口图标，此属性即用于不删快捷方式达到同样效果。
+    const WINDOW_AUMID: &str = "com.zander.coding-plan-limit.main";
+    /// PKEY_AppUserModel_ID（propkey.h，windows-sys 未导出常量）
+    const PKEY_APP_USER_MODEL_ID: PROPERTYKEY = PROPERTYKEY {
+        fmtid: windows_sys::core::GUID {
+            data1: 0x9F4C_2855,
+            data2: 0x9F3E,
+            data3: 0x4144,
+            data4: [0x9C, 0x3A, 0x9C, 0x6C, 0x41, 0xC7, 0xC6, 0xC5],
+        },
+        pid: 5,
+    };
+    /// IID_IPropertyStore {886D8EEB-8CF2-4446-8D02-CDBA1DBDCF4B}
+    const IID_IPROPERTYSTORE: windows_sys::core::GUID = windows_sys::core::GUID {
+        data1: 0x886D_8EEB,
+        data2: 0x8CF2,
+        data3: 0x4446,
+        data4: [0x8D, 0x02, 0xCD, 0xBA, 0x1D, 0xBD, 0xCF, 0x4B],
+    };
+
+    /// windows-sys 未定义 IPropertyStore 接口，按 propsys.h 声明最小 vtbl
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    #[allow(non_snake_case)]
+    struct IPropertyStoreVtbl {
+        QueryInterface: unsafe extern "system" fn(
+            *mut core::ffi::c_void,
+            *const windows_sys::core::GUID,
+            *mut *mut core::ffi::c_void,
+        ) -> windows_sys::core::HRESULT,
+        AddRef: unsafe extern "system" fn(*mut core::ffi::c_void) -> u32,
+        Release: unsafe extern "system" fn(*mut core::ffi::c_void) -> u32,
+        GetCount: unsafe extern "system" fn(*mut core::ffi::c_void, *mut u32) -> windows_sys::core::HRESULT,
+        GetAt: unsafe extern "system" fn(*mut core::ffi::c_void, u32, *mut PROPERTYKEY) -> windows_sys::core::HRESULT,
+        GetValue: unsafe extern "system" fn(
+            *mut core::ffi::c_void,
+            *const PROPERTYKEY,
+            *mut PROPVARIANT,
+        ) -> windows_sys::core::HRESULT,
+        SetValue: unsafe extern "system" fn(
+            *mut core::ffi::c_void,
+            *const PROPERTYKEY,
+            *const PROPVARIANT,
+        ) -> windows_sys::core::HRESULT,
+        Commit: unsafe extern "system" fn(*mut core::ffi::c_void) -> windows_sys::core::HRESULT,
+    }
+
+    /// AUMID 宽字符常驻（属性库可能持有指针，须与窗口同生命周期）
+    fn aumid_wide() -> &'static [u16] {
+        static WIDE: std::sync::OnceLock<Vec<u16>> = std::sync::OnceLock::new();
+        WIDE.get_or_init(|| format!("{WINDOW_AUMID}\0").encode_utf16().collect())
+    }
+
+    /// 最近一次进程级 AUMID 设置结果（setup 时写入诊断日志）
+    pub static PROCESS_AUMID_HR: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(u32::MAX);
+
+    /// 给窗口设独立 AUMID：官方机制 = 窗口属性库 IPropertyStore::SetValue；
+    /// 另以 SetPropW 设两种已知属性名字符串兜底（无效名闲置无害）。
+    unsafe fn set_window_aumid(hwnd: HWND) {
+        let id = aumid_wide();
+
+        let mut store: *mut core::ffi::c_void = std::ptr::null_mut();
+        let hr = SHGetPropertyStoreForWindow(hwnd, &IID_IPROPERTYSTORE, &mut store);
+        if hr == 0 && !store.is_null() {
+            let vtbl = **(store as *mut *const IPropertyStoreVtbl);
+            let mut pv: PROPVARIANT = core::mem::zeroed();
+            pv.Anonymous.Anonymous = PROPVARIANT_0_0 {
+                vt: 31, // VT_LPWSTR
+                wReserved1: 0,
+                wReserved2: 0,
+                wReserved3: 0,
+                Anonymous: PROPVARIANT_0_0_0 {
+                    pwszVal: id.as_ptr() as *mut u16,
+                },
+            };
+            (vtbl.SetValue)(store, &PKEY_APP_USER_MODEL_ID, &pv);
+            (vtbl.Commit)(store);
+            (vtbl.Release)(store);
+        }
+
+        SetPropW(
+            hwnd,
+            windows_sys::core::w!("System.AppUserModel.ID"),
+            id.as_ptr() as *mut core::ffi::c_void,
+        );
+        SetPropW(
+            hwnd,
+            windows_sys::core::w!("System.AppUserModelID"),
+            id.as_ptr() as *mut core::ffi::c_void,
+        );
+    }
+
+    /// RGBA 按目标尺寸 box-filter 缩放，输出 BGRA（32bpp 顶朝下 DIB 的内存字节序）
+    fn scale_bgra(rgba: &[u8], sw: u32, sh: u32, tw: u32, th: u32) -> Vec<u8> {
+        let mut out = vec![0u8; (tw * th * 4) as usize];
+        for ty in 0..th {
+            let y0 = ty * sh / th;
+            let y1 = ((ty + 1) * sh / th).clamp(y0 + 1, sh);
+            for tx in 0..tw {
+                let x0 = tx * sw / tw;
+                let x1 = ((tx + 1) * sw / tw).clamp(x0 + 1, sw);
+                let (mut r, mut g, mut b, mut a, mut n) = (0u32, 0u32, 0u32, 0u32, 0u32);
+                for y in y0..y1 {
+                    for x in x0..x1 {
+                        let i = ((y * sw + x) * 4) as usize;
+                        r += rgba[i] as u32;
+                        g += rgba[i + 1] as u32;
+                        b += rgba[i + 2] as u32;
+                        a += rgba[i + 3] as u32;
+                        n += 1;
+                    }
+                }
+                let o = ((ty * tw + tx) * 4) as usize;
+                out[o] = (b / n) as u8;
+                out[o + 1] = (g / n) as u8;
+                out[o + 2] = (r / n) as u8;
+                out[o + 3] = (a / n) as u8;
+            }
+        }
+        out
+    }
+
+    /// BGRA 像素 → HICON（32bpp alpha 色位图 + 全零 1bpp mask，alpha 通道生效）
+    unsafe fn make_hicon(bgra: &[u8], w: u32, h: u32) -> HICON {
+        let dib = |bits: u16, height: i32| BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: w as i32,
+                biHeight: height,
+                biPlanes: 1,
+                biBitCount: bits,
+                biCompression: 0, // BI_RGB
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let dc = GetDC(std::ptr::null_mut());
+        let mut color_bits: *mut core::ffi::c_void = std::ptr::null_mut();
+        let color = CreateDIBSection(
+            dc,
+            &dib(32, -(h as i32)),
+            0, // DIB_RGB_COLORS
+            &mut color_bits,
+            std::ptr::null_mut(),
+            0,
+        );
+        let mut mask_bits: *mut core::ffi::c_void = std::ptr::null_mut();
+        let mask = CreateDIBSection(
+            dc,
+            &dib(1, h as i32),
+            0,
+            &mut mask_bits,
+            std::ptr::null_mut(),
+            0,
+        );
+        ReleaseDC(std::ptr::null_mut(), dc);
+        if color.is_null() || mask.is_null() || color_bits.is_null() {
+            return std::ptr::null_mut();
+        }
+        // CreateDIBSection 内存零初始化：mask 全零（不遮挡），色位图逐像素覆盖
+        std::ptr::copy_nonoverlapping(bgra.as_ptr(), color_bits as *mut u8, bgra.len());
+        let info = ICONINFO {
+            fIcon: 1,
+            xHotspot: 0,
+            yHotspot: 0,
+            hbmMask: mask,
+            hbmColor: color,
+        };
+        let hicon = CreateIconIndirect(&info);
+        DeleteObject(color);
+        DeleteObject(mask);
+        hicon
+    }
+
+    /// 双通道设置窗口图标（small=标题栏/任务栏按钮，big=Alt-Tab），返回是否成功。
+    /// 先脱钩 AUMID，再设类图标 + WM_SETICON；任务栏按钮（重）建时按
+    /// "无快捷方式关联 → 窗口图标" 取值。
+    pub unsafe fn apply(hwnd: HWND, rgba: &[u8], w: u32, h: u32) -> bool {
+        set_window_aumid(hwnd);
+        let (sw, sh) = (
+            GetSystemMetrics(SM_CXSMICON).max(16) as u32,
+            GetSystemMetrics(SM_CYSMICON).max(16) as u32,
+        );
+        let (bw, bh) = (
+            GetSystemMetrics(SM_CXICON).max(16) as u32,
+            GetSystemMetrics(SM_CYICON).max(16) as u32,
+        );
+        let small = make_hicon(&scale_bgra(rgba, w, h, sw, sh), sw, sh);
+        let big = make_hicon(&scale_bgra(rgba, w, h, bw, bh), bw, bh);
+        if small.is_null() || big.is_null() {
+            return false;
+        }
+        SetClassLongPtrW(hwnd, GCLP_HICON, big as isize);
+        SetClassLongPtrW(hwnd, GCLP_HICONSM, small as isize);
+        SendMessageW(hwnd, WM_SETICON, ICON_BIG as usize, big as isize);
+        SendMessageW(hwnd, WM_SETICON, ICON_SMALL as usize, small as isize);
+        true
+    }
+}
+
+/// 进程级 AUMID（须在任何窗口 show 之前调用）：显式 AUMID 使任务栏不再按
+/// exe 路径把窗口关联到开始菜单快捷方式（快捷方式图标 = exe 内嵌图标），
+/// 按钮图标回落为窗口图标。窗口级（属性库）版本实测未被图标选择采纳，
+/// 进程级是 Electron/Qt 同款的可靠解耦机制。
+#[cfg(windows)]
+pub fn init_process_aumid() {
+    let hr = unsafe {
+        windows_sys::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
+            windows_sys::core::w!("com.zander.coding-plan-limit.main"),
+        )
+    };
+    win_icon::PROCESS_AUMID_HR.store(hr as u32, std::sync::atomic::Ordering::Relaxed);
+}
+
+#[cfg(not(windows))]
+pub fn init_process_aumid() {}
+
+/// 供 setup 写诊断日志
+pub fn process_aumid_hr() -> u32 {
+    #[cfg(windows)]
+    {
+        win_icon::PROCESS_AUMID_HR.load(std::sync::atomic::Ordering::Relaxed)
+    }
+    #[cfg(not(windows))]
+    {
+        0
+    }
+}
+
+/// 窗口显示前调用：任务栏按钮在窗口 show 时创建，创建时读取的类图标已是正确值
+pub fn prime_window_icon(app: &AppHandle) {
+    if let Some(img) = resolve_saved_logo(app) {
+        apply_window_icon(app, &img);
+    }
+}
+
+/// 运行中更换窗口图标后，Windows 11 任务栏按钮可能仍缓存旧图：
+/// 主窗口可见时 hide → 短暂等待（让 explorer 销毁旧按钮）→ show 强制重建，
+/// 重建时按钮读取的类图标已在 apply_window_icon 中更新
+fn refresh_taskbar_button(win: &tauri::WebviewWindow) {
+    if win.is_visible().unwrap_or(false) {
+        let _ = win.hide();
+        std::thread::sleep(std::time::Duration::from_millis(60));
+        let _ = win.show();
+        let _ = win.set_focus();
+    }
+}
+
+/// 设置主窗口图标并刷新任务栏按钮。
+/// Windows：类图标 + WM_SETICON 双设（仅 WM_SETICON 时任务栏按钮不跟随）；
+/// 失败回落 tauri set_icon（仅窗口级）。
+pub fn apply_window_icon(app: &AppHandle, img: &tauri::image::Image<'_>) {
+    if let Some(win) = app.get_webview_window("main") {
+        #[cfg(windows)]
+        {
+            if let Ok(hwnd) = win.hwnd() {
+                let ok =
+                    unsafe { win_icon::apply(hwnd.0, img.rgba(), img.width(), img.height()) };
+                debug_log(app, &format!("window_icon raw={ok}"));
+                if ok {
+                    refresh_taskbar_button(&win);
+                    return;
+                }
+            }
+        }
+        let _ = win.set_icon(img.clone());
+        refresh_taskbar_button(&win);
+    }
+}
 
 /// 前端把用户选择的图片画成 PNG dataURL 后提交；Rust 解码并实时更换托盘图标
 #[tauri::command]
@@ -300,11 +632,10 @@ pub fn set_custom_icon(app: AppHandle, data_url: String) -> Result<(), String> {
     .map_err(|e| format!("图标数据解码失败: {e}"))?;
     let img = tauri::image::Image::from_bytes(&raw[..])
         .map_err(|e| format!("图标解析失败: {e}"))?;
+    debug_log(&app, "set_custom_icon: 解码成功，应用托盘+窗口图标");
     apply_tray_icon(&app, img.clone());
-    // 同步主窗口标题栏/任务栏图标（任务栏常驻图标仍以 exe 内置图标为准，运行时无法替换）
-    if let Some(win) = app.get_webview_window("main") {
-        let _ = win.set_icon(img);
-    }
+    // 同步主窗口标题栏/任务栏图标（任务栏 pinned 图标仍以 exe 内置图标为准，运行时无法替换）
+    apply_window_icon(&app, &img);
 
     store::update_config(&app, |config| {
         config.settings.custom_icon = Some(data_url);
@@ -313,9 +644,22 @@ pub fn set_custom_icon(app: AppHandle, data_url: String) -> Result<(), String> {
     Ok(())
 }
 
-/// 切换内置 Logo：color（原色）| mono（单色白）| custom（仅落盘，配合 set_custom_icon 使用）
+/// 切换 Logo 样式：color（原色）| mark（Z 标）| custom（应用存档的自定义图）
 #[tauri::command]
 pub fn set_logo_style(app: AppHandle, style: String) -> Result<(), String> {
+    // custom 不再是空操作：运行中从内置样式切回自定义时，需按存档图恢复托盘/窗口图标
+    let custom_img: Option<tauri::image::Image> = if style == "custom" {
+        let settings = store::load_settings(&app);
+        Some(
+            settings
+                .custom_icon
+                .and_then(|d| decode_data_url_png(&d))
+                .ok_or("未配置自定义图标，请先选择图片")?,
+        )
+    } else {
+        None
+    };
+    debug_log(&app, &format!("set_logo_style: {style}"));
     match style.as_str() {
         "color" => {
             let default_icon = app
@@ -323,34 +667,25 @@ pub fn set_logo_style(app: AppHandle, style: String) -> Result<(), String> {
                 .expect("缺少应用图标")
                 .clone();
             apply_tray_icon(&app, default_icon.clone());
-            if let Some(win) = app.get_webview_window("main") {
-                let _ = win.set_icon(default_icon);
-            }
+            apply_window_icon(&app, custom_img.as_ref().unwrap_or(&default_icon));
         }
         "mark" => {
             let img = tauri::image::Image::from_bytes(LOGO_MARK)
                 .map_err(|e| format!("Logo Mark 解析失败: {e}"))?;
             apply_tray_icon(&app, img.clone());
-            if let Some(win) = app.get_webview_window("main") {
-                let _ = win.set_icon(img);
-            }
+            apply_window_icon(&app, &img);
         }
-        "mono" => {
-            let img = tauri::image::Image::from_bytes(LOGO_MONO)
-                .map_err(|e| format!("单色 Logo 解析失败: {e}"))?;
+        "custom" => {
+            // style == "custom" 时上方已确保解码成功
+            let img = custom_img.expect("custom 样式必有自定义图");
             apply_tray_icon(&app, img.clone());
-            if let Some(win) = app.get_webview_window("main") {
-                let _ = win.set_icon(img);
-            }
+            apply_window_icon(&app, &img);
         }
-        "custom" => {}
         _ => return Err(format!("未知 Logo 样式: {style}")),
     }
+    // 自定义图片保留不清空：切换内置样式后仍可一键切回自定义
     store::update_config(&app, |config| {
         config.settings.logo_style = style;
-        if config.settings.custom_icon.is_some() && config.settings.logo_style != "custom" {
-            config.settings.custom_icon = None;
-        }
     })?;
     Ok(())
 }
@@ -358,13 +693,10 @@ pub fn set_logo_style(app: AppHandle, style: String) -> Result<(), String> {
 #[tauri::command]
 pub fn reset_custom_icon(app: AppHandle) -> Result<(), String> {
     if let Some(default_icon) = app.default_window_icon() {
+        let default_icon = default_icon.clone();
         // 托盘与主窗口（任务栏）同步恢复默认
-        if let Some(tray) = app.tray_by_id("main-tray") {
-            let _ = tray.set_icon(Some(default_icon.clone()));
-        }
-        if let Some(win) = app.get_webview_window("main") {
-            let _ = win.set_icon(default_icon.clone());
-        }
+        apply_tray_icon(&app, default_icon.clone());
+        apply_window_icon(&app, &default_icon);
     }
     store::update_config(&app, |config| {
         config.settings.custom_icon = None;
@@ -374,8 +706,13 @@ pub fn reset_custom_icon(app: AppHandle) -> Result<(), String> {
 }
 
 pub fn apply_tray_icon(app: &AppHandle, img: tauri::image::Image<'_>) {
-    if let Some(tray) = app.tray_by_id("main-tray") {
-        let _ = tray.set_icon(Some(img));
+    match app.tray_by_id("main-tray") {
+        Some(tray) => {
+            if let Err(e) = tray.set_icon(Some(img)) {
+                debug_log(app, &format!("tray_icon 设置失败: {e}"));
+            }
+        }
+        None => debug_log(app, "tray_icon: main-tray 不存在（托盘尚未创建）"),
     }
 }
 

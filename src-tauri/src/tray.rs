@@ -64,8 +64,13 @@ pub fn create(app: &tauri::App) -> tauri::Result<()> {
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &refresh, &quit])?;
 
+    // 初始图标按设置解析（custom 头像 / Mark），无则用应用默认原色图标——
+    // 启动恢复必须在这里做：setup 阶段托盘尚未创建，set_icon 会静默失败
+    let icon = crate::commands::resolve_saved_logo(app.handle())
+        .unwrap_or_else(|| app.default_window_icon().expect("缺少应用图标").clone());
+
     TrayIconBuilder::with_id("main-tray")
-        .icon(app.default_window_icon().expect("缺少应用图标").clone())
+        .icon(icon)
         .tooltip("查看额度")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -113,6 +118,8 @@ pub fn create(app: &tauri::App) -> tauri::Result<()> {
 
 pub fn show_main(app: &AppHandle) {
     if let Some(win) = app.get_webview_window("main") {
+        // show 前补设：任务栏按钮随 show 创建，创建时图标即为最新值
+        crate::commands::prime_window_icon(app);
         let _ = win.show();
         let _ = win.unminimize();
         let _ = win.set_focus();

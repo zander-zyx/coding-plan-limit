@@ -3,6 +3,21 @@
 const list = document.getElementById('list');
 const updatedEl = document.getElementById('updated');
 const statusDot = document.getElementById('status-dot');
+const popupLogo = document.getElementById('popup-logo');
+
+// 头部 Logo 跟随设置：custom 图 / Mark 替换状态点显示（点击同样关闭弹窗）
+function renderPopupLogo(s) {
+  if (!s) return;
+  const customImg = s.logo_style === 'custom' && s.custom_icon;
+  if (customImg || s.logo_style === 'mark') {
+    popupLogo.src = customImg || 'icons/app-mark.png';
+    popupLogo.hidden = false;
+    statusDot.style.display = 'none';
+  } else {
+    popupLogo.hidden = true;
+    statusDot.style.display = '';
+  }
+}
 
 let moreOpen = false;
 let lastViews = [];
@@ -29,6 +44,7 @@ function render(views, settings) {
     const s = settings || lastSettings;
     if (!s) return;
     lastSettings = s;
+    renderPopupLogo(s);
 
     const { primary, rest } = splitPopupViews(views, s.popup_plan_ids);
     const enabled = views.filter((v) => v.plan.enabled);
@@ -123,6 +139,7 @@ document.getElementById('btn-settings').addEventListener('click', () => invoke('
 
 // 状态点：点击关闭弹窗（Windows 悬停驱动，重入托盘会再次打开）
 statusDot.addEventListener('click', () => invoke('hide_popup').catch(() => {}));
+popupLogo.addEventListener('click', () => invoke('hide_popup').catch(() => {}));
 
 // ─── 更新按钮（仅在有新版本时出现在头部） ─────────────────────
 let updateUrl = null;

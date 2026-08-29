@@ -52,10 +52,12 @@ function hexToHue(hex) {
   return deg >= 260 && deg <= 280 ? 257 : deg;
 }
 
-/** 用户选色 → 提取 Hue 写入 --brand-hue，全站配色自动派生 */
-function applyAccent(hex) {
+/** 用户选色 → 提取 Hue 写入 --brand-hue，全站配色自动派生；animate 时经 Motion 平滑过渡 */
+function applyAccent(hex, animate) {
   const ok = hex && /^#[0-9a-fA-F]{6}$/.test(hex);
-  document.documentElement.style.setProperty('--brand-hue', ok ? String(hexToHue(hex)) : '252');
+  const hue = ok ? hexToHue(hex) : 252;
+  if (animate && window.Motion) Motion.hueTo(hue);
+  else document.documentElement.style.setProperty('--brand-hue', String(hue));
 }
 
 function applySettingsLook(s) {
@@ -149,6 +151,7 @@ function rowHtml(view, opts = {}) {
   const snap = view.snapshot;
   let right = '';
   let rightCls = '';
+  let pctData = '';
   let barPct = -1;
   let tip = '';
   let urgent = false;
@@ -175,12 +178,13 @@ function rowHtml(view, opts = {}) {
         <div class="win-line ${urgentLine}">
           <span>${esc(w.label)}</span>
           <div class="bar slim ${urgentLine ? 'urgent-fill' : ''}"><i data-w="${u.toFixed(1)}"></i></div>
-          <b>${u.toFixed(u < 10 ? 1 : 0)}%</b>
+          <b data-count="${u}" data-fmt="${u < 10 ? 'pct1' : 'pct0'}">${u.toFixed(u < 10 ? 1 : 0)}%</b>
           ${reset ? `<em>${esc(reset)}</em>` : ''}
         </div>`;
       }).join('');
     } else if (q.kind === 'balance') {
       right = `${q.currency === 'CNY' ? '¥' : '$'}${q.amount.toFixed(2)}`;
+      pctData = ` data-count="${q.amount}" data-fmt="${q.currency === 'CNY' ? 'cny' : 'usd'}"`;
       // 余额明细走 win-line 结构与窗口行对齐（无 note 时不渲染多余行）
       if (q.note) {
         lines = `
@@ -216,7 +220,7 @@ function rowHtml(view, opts = {}) {
       <div class="row-body">
         <div class="row-top">
           <span class="row-name">${esc(view.plan.name)}${view.plan.enabled ? '' : ' <em class="row-off">已停用</em>'}</span>
-          ${right ? `<span class="row-pct ${rightCls}">${esc(right)}</span>` : ''}
+          ${right ? `<span class="row-pct ${rightCls}"${pctData}>${esc(right)}</span>` : ''}
         </div>
         ${lines}
       </div>
@@ -244,8 +248,13 @@ function splitPopupViews(views, popupPlanIds, max) {
   return { primary: picked, rest };
 }
 
-/** 渲染后触发进度条从 0 → 目标值的填充动画（每次刷新都有生命感） */
+/** 渲染后驱动：行入场瀑布 + 进度条填充 + 数字滚动（每次刷新都有"数据到达"的生命感） */
 function animateBars(container) {
+  if (window.Motion) {
+    Motion.rowsIn(container);
+    Motion.dataIn(container);
+    return;
+  }
   requestAnimationFrame(() => requestAnimationFrame(() => {
     container.querySelectorAll('.bar > i[data-w]').forEach((el) => {
       el.style.width = el.dataset.w + '%';

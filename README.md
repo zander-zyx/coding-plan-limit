@@ -31,14 +31,14 @@
 | 托盘常驻 | 关闭主窗口即驻留托盘；**Windows 悬停图标弹出面板**（macOS/Linux 左键点击——系统 API 限制），打开即节流刷新 |
 | 悬浮面板 | 固定展示 **1–10 家**自选套餐（未选默认 3 家，顺序跟随列表拖拽排序），点击卡片直达官网，其余收进"更多"折叠区 |
 | 窗口明细 | **5小时 → 7天 → 月 → MCP** 固定排序，每窗口独立行（标签+进度条+百分比+重置时刻）；"有啥显示啥"，不支持的不报错 |
-| 内置模板 | **15 个**（见下表），填密钥即用 |
+| 内置模板 | **11 个**（见下表），填密钥即用 |
 | 拖拽排序 | 套餐列表拖拽排序，持久化并决定弹窗展示/补足顺序 |
 | 进度样式 | 平滑填充（默认）/ 环形（主窗口），弹窗统一行式 |
 | 阈值通知 | 每套餐阈值（窗口型=剩余%、余额型=金额下限）；提醒频率三选一：不通知 / 按间隔 / 按次数；同告警不刷屏，紧急行变暖琥珀色 |
-| 自定义外观 | 主题（系统/浅色/深色）、主题色（预设+拾色器+#RRGGBB，**弹窗实时跟随**）、Logo 四态（原色/单色/Mark/自定义图片，托盘+标题栏+侧边同步） |
+| 自定义外观 | 主题（系统/浅色/深色）、主题色（预设+拾色器+#RRGGBB，**弹窗实时跟随**）、Logo 三态（原色/Mark/自定义图片，托盘+标题栏+侧边同步） |
 | 数据本地 | 配置 `config.json`（损坏自动备份并拒绝写入）、密钥系统凭据库、快照 `snapshots.json` |
 
-## 内置模板（15 个）
+## 内置模板（11 个）
 
 | 模板 | 数据内容 | 认证方式 |
 |---|---|---|
@@ -47,29 +47,21 @@
 | Kimi For Coding | 5小时窗口 + 7天限额（重置时刻） | API Key |
 | **Claude Official** | 官方订阅 5小时 / 7天 / Opus / Sonnet（读本机 `~/.claude/.credentials.json`，需 Claude CLI 已登录） | 无需密钥 |
 | **Codex / ChatGPT** | 官方订阅窗口额度（读本机 `~/.codex/auth.json`，需 Codex CLI 已登录） | 无需密钥 |
-| Claude (via claude-mini-hud) | 5小时 / 7天限额（读取 [claude-mini-hud](https://github.com/zander-zyx/claude-mini-hud) 本地缓存） | 无需密钥 |
-| 小米 MiMo Token Plan | 月度固定额度 | 浏览器 Cookie（推荐）或 API Key |
 | DeepSeek | 账户余额（多币种优先 CNY） | API Key |
 | Kimi / Moonshot | 账户余额 | API Key |
 | 阶跃星辰 StepFun | 账户余额 | API Key |
 | 硅基流动 SiliconFlow | 账户余额（国际站 USD） | API Key |
-| 阿里云 DashScope | 账户余额 | 阿里云主账号 AK（BSS OpenAPI） |
-| **PackyCode** | 余额（OpenAI 兼容计费接口，默认 `https://www.packyapi.ai`） | API Key |
 | **NewAPI / OneAPI 站点** | 余额（填站点地址；币种跟随站点后台显示设置） | API Key |
 | **Sub2API** | 余额（填站点地址，需兼容 OpenAI 计费接口） | API Key |
-
-> 查询逻辑移植自 [claude-mini-hud](https://github.com/zander-zyx/claude-mini-hud)，并逐字段对齐 [cc-switch](https://github.com/farion1231/cc-switch) 的实现（智谱 unit 分类、MiniMax 周窗口门控、Claude/Codex OAuth usage 接口等）。
 
 ## 快速开始
 
 1. **添加套餐**：托盘菜单 →「打开主界面」→ 套餐 →「＋ 添加套餐」→ 选品牌 → 填名称与密钥 → 保存
    - Claude Official / Codex：先在终端 `claude login` / `codex login`，应用自动读本机凭据
-   - 小米：登录网页版 → F12 → 复制请求头完整 `Cookie`
-   - 阿里云：主账号 AccessKey（BSS OpenAPI），不是 DashScope Key
    - NewAPI 系：填站点地址 + API Key（站点需兼容 `/v1/dashboard/billing/*`）
 2. **悬浮窗**：设置 → 悬浮弹窗 → 勾选常驻套餐（1–10 家）；拖拽套餐列表调顺序，弹窗同步；点卡片跳官网
 3. **通知**：每套餐设阈值（默认剩余 10%）；提醒频率按需选择；紧急窗口/进度条自动变暖琥珀色
-4. **外观**：主题 / 主题色（含 `#RRGGBB` 输入）/ 进度样式 / Logo 四态（原色、单色白、Mark、自定义图片）
+4. **外观**：主题 / 主题色（含 `#RRGGBB` 输入）/ 进度样式 / Logo 三态（原色、Mark、自定义图片）
 
 ## 数据与隐私
 
@@ -90,7 +82,7 @@ npm run build    # 构建当前平台安装包
 
 环境要求：Rust stable（+ MSVC / Xcode CLT / webkit2gtk）、Node.js ≥ 18。
 
-辅助脚本：`scripts/render-mark.mjs`（Logo Mark 光栅化）、`scripts/fetch-logos*.mjs`（品牌图标抓取）、`scripts/make-icon.ps1`（默认图标）、`dev-preview/index.html`（浏览器设计预览）。
+辅助脚本：`scripts/render-mark.mjs`（Logo Mark 光栅化）、`scripts/make-icon.ps1`（默认图标重生成）、`dev-preview/index.html`（浏览器设计预览）。
 
 ## 已知限制
 
@@ -98,4 +90,4 @@ npm run build    # 构建当前平台安装包
 - macOS 的 Claude 凭据在钥匙串，claude-official 模板目前仅读取文件凭据（Windows/Linux）
 - NewAPI 系币种跟随站点后台显示设置（API 无法自省）
 - 待支持：火山引擎 Coding Plan（AK/SK 签名）、AWS Bedrock（CloudWatch）、xAI Grok 订阅（OAuth/gRPC）
-- 小米 Cookie 过期需重新粘贴；Claude/Codex 凭据过期会提示重新 login
+- Claude/Codex 凭据过期会提示重新 login

@@ -20,6 +20,7 @@ document.querySelectorAll('.side nav button').forEach((btn) => {
     ['plans', 'settings', 'about'].forEach((v) => {
       $(`view-${v}`).hidden = v !== btn.dataset.view;
     });
+    if (window.Motion) Motion.viewIn($(`view-${btn.dataset.view}`));
   });
 });
 
@@ -317,16 +318,21 @@ function openModal(planId) {
   if (planId) renderFormFields();
   validateForm();
   $('plan-modal').classList.add('show');
+  if (window.Motion) Motion.modalIn($('plan-modal').querySelector('.modal'));
 }
 
 function closeModal() {
+  // 退场动画播完再清表单（渐隐中内容保持可读）；未接管时同步清理
+  const cleanup = () => {
+    ['f-name', 'f-bearer', 'f-cookie', 'f-cookie-key', 'f-ak-id', 'f-ak-secret', 'f-baseurl']
+      .forEach((id) => ($(id).value = ''));
+    state.editingId = null;
+    state.selectedTpl = null;
+    state.tplVariant = 'kimi';
+    state.pendingLogo = null;
+  };
   $('plan-modal').classList.remove('show');
-  ['f-name', 'f-bearer', 'f-cookie', 'f-cookie-key', 'f-ak-id', 'f-ak-secret', 'f-baseurl']
-    .forEach((id) => ($(id).value = ''));
-  state.editingId = null;
-  state.selectedTpl = null;
-  state.tplVariant = 'kimi';
-  state.pendingLogo = null;
+  if (!(window.Motion && Motion.modalOut($('plan-modal').querySelector('.modal'), cleanup))) cleanup();
 }
 
 $('btn-add').addEventListener('click', () => openModal(null));
@@ -459,16 +465,23 @@ function renderSettings() {
       saveSettings({ popup_plan_ids: ids });
     }));
 
-  const logoStyle = s.custom_icon ? 'custom' : (s.logo_style || 'color');
+  // 以 logo_style 为准（custom_icon 只是自定义图存档，切内置样式时保留）；
+  // 存量 mono 已移除，custom 无图回落原色
+  let logoStyle = ['color', 'mark', 'custom'].includes(s.logo_style) ? s.logo_style : 'color';
+  if (logoStyle === 'custom' && !s.custom_icon) logoStyle = 'color';
   $('seg-logo-style').querySelectorAll('button').forEach((b) =>
     b.classList.toggle('active', b.dataset.v === logoStyle));
   $('btn-icon-pick').hidden = logoStyle !== 'custom';
-  const preview = $('icon-preview');
+  // 自定义选项本身即预览位：有图显图，无图显 +
+  const thumb = $('custom-logo-thumb');
+  const plus = $('custom-logo-plus');
   if (s.custom_icon) {
-    preview.src = s.custom_icon;
-    preview.hidden = false;
+    thumb.src = s.custom_icon;
+    thumb.hidden = false;
+    plus.hidden = true;
   } else {
-    preview.hidden = true;
+    thumb.hidden = true;
+    plus.hidden = false;
   }
 }
 
@@ -481,7 +494,7 @@ async function saveSettings(patch) {
       window.__themePref = patch.theme;
       applyTheme(patch.theme);
     }
-    if (patch.accent !== undefined) applyAccent(patch.accent);
+    if (patch.accent !== undefined) applyAccent(patch.accent, true);
   } catch (e) {
     toast(String(e));
   }
@@ -526,7 +539,7 @@ $('accent-hex').addEventListener('change', (e) => {
 });
 $('accent-reset').addEventListener('click', () => saveSettings({ accent: null }).then(renderSettings));
 
-// ─── Logo（原色 / 单色 / 自定义图片，托盘+标题栏+侧边栏同步） ──
+// ─── Logo（原色 / Mark / 自定义图片，托盘+标题栏+侧边栏同步） ──
 function pickLogoImage() {
   const input = document.createElement('input');
   input.type = 'file';
@@ -561,7 +574,9 @@ function pickLogoImage() {
 $('btn-icon-pick').addEventListener('click', pickLogoImage);
 
 $('seg-logo-style').addEventListener('click', async (e) => {
-  const v = e.target.dataset?.v;
+  // 选项是图片按钮：点击可能落在内部 img/span 上，需上溯到 button
+  const btn = e.target.closest?.('button[data-v]');
+  const v = btn?.dataset.v;
   if (!v) return;
   try {
     if (v === 'custom' && !state.settings?.custom_icon) {
@@ -639,17 +654,19 @@ async function reload() {
 function renderSideLogo() {
   const logo = $('logo');
   const dot = $('logo-dot');
-  const custom = state.settings?.custom_icon;
-  const mono = !custom && state.settings?.logo_style === 'mono';
+  const style = state.settings?.logo_style;
+  // custom 图与 mark 为图片标：替换 brand-dot 显示；custom_icon 仅在 custom 样式下使用
+  const customImg = style === 'custom' && state.settings?.custom_icon;
+  const builtinImg = !customImg && style === 'mark';
   let img = logo.querySelector('img.side-logo-img');
-  if (custom || mono) {
+  if (customImg || builtinImg) {
     dot.style.display = 'none';
     if (!img) {
       img = document.createElement('img');
       img.className = 'side-logo-img';
       logo.prepend(img);
     }
-    img.src = custom || (state.settings?.logo_style === 'mark' ? 'icons/app-mark.png' : 'icons/logo-mono.png');
+    img.src = customImg || 'icons/app-mark.png';
   } else {
     dot.style.display = '';
     img?.remove();

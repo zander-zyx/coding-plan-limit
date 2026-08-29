@@ -21,6 +21,9 @@ use tauri::{Manager, WindowEvent};
 use state::AppState;
 
 fn main() {
+    // 最早时机设进程级 AUMID：与开始菜单快捷方式解耦，任务栏按钮改用窗口图标
+    commands::init_process_aumid();
+
     tauri::Builder::default()
         // 第二实例启动时唤起已有实例的主窗口
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -68,30 +71,17 @@ fn main() {
                 }
             }
 
-            // 应用 Logo（自定义 > 单色 > 默认原色），同步托盘 + 主窗口标题栏图标
+            // 应用主窗口 Logo（按 logo_style：custom > mark > 默认原色），窗口级 + 类级
+            // 图标双设——任务栏按钮在窗口 show 时读取类图标；
+            // 托盘初始图标在 tray::create 内按同一设置解析（托盘创建前调
+            // apply_tray_icon 会因 tray 尚不存在而静默丢失，曾有此 bug）
             {
-                let settings = store::load_settings(app.handle());
-                let img = if let Some(data_url) = settings.custom_icon {
-                    data_url
-                        .strip_prefix("data:image/png;base64,")
-                        .and_then(|payload| {
-                            base64::Engine::decode(
-                                &base64::engine::general_purpose::STANDARD,
-                                payload,
-                            )
-                            .ok()
-                        })
-                        .and_then(|raw| tauri::image::Image::from_bytes(&raw[..]).ok())
-                } else if settings.logo_style == "mono" {
-                    tauri::image::Image::from_bytes(commands::LOGO_MONO).ok()
-                } else {
-                    None
-                };
-                if let Some(img) = img {
-                    commands::apply_tray_icon(app.handle(), img.clone());
-                    if let Some(win) = app.get_webview_window("main") {
-                        let _ = win.set_icon(img);
-                    }
+                commands::debug_log(
+                    app.handle(),
+                    &format!("startup: process_aumid hr={}", commands::process_aumid_hr()),
+                );
+                if let Some(img) = commands::resolve_saved_logo(app.handle()) {
+                    commands::apply_window_icon(app.handle(), &img);
                 }
             }
 
@@ -137,6 +127,8 @@ fn main() {
                 && state::SHOW_MAIN_ON_LOAD.swap(false, std::sync::atomic::Ordering::Relaxed)
             {
                 if let Some(win) = webview.app_handle().get_webview_window("main") {
+                    // show 前补设：任务栏按钮随 show 创建，创建时图标即为最新值
+                    commands::prime_window_icon(webview.app_handle());
                     let _ = win.show();
                 }
             }

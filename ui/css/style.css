@@ -3,6 +3,7 @@
    配色：--brand-hue 派生；背景 #0f0f1a(深) / #faf8f5(浅)
    字号 12/13/16（行内百分比 15 为数据强调特例）；字重 400/500/600
    过渡统一 180ms cubic-bezier(0.4,0,0.2,1)
+   编排动效（行入场/进度条/数字滚动/视图/弹层/换色）走 js/motion.js(GSAP)
    禁止：纯黑白、霓虹色、装饰性渐变、成功 toast、确认对话框
    ============================================================ */
 
@@ -75,14 +76,12 @@ input, select, textarea { font: inherit; color: var(--text-p); }
   display: flex;
   flex-direction: column;
   border-radius: 24px;
-  background: rgba(20, 19, 31, 0.90);
+  background: rgba(20, 19, 31, 0.96);
   backdrop-filter: blur(56px) saturate(160%);
   -webkit-backdrop-filter: blur(56px) saturate(160%);
   border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 18px 50px rgba(0, 0, 0, 0.22),
-    0 4px 14px rgba(0, 0, 0, 0.14);
+  /* 外部阴影画在 panel 矩形盒子上、会被窗口边缘裁断形成"双角"，故只留内高光 */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   overflow: hidden;
   position: relative;
   animation: panelIn 200ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -91,15 +90,23 @@ input, select, textarea { font: inherit; color: var(--text-p); }
   from { opacity: 0; transform: scale(0.985) translateY(4px); }
   to { opacity: 1; transform: none; }
 }
-html[data-theme='dark'] .panel { background: rgba(20, 19, 31, 0.90); }
+html[data-theme='dark'] .panel { background: rgba(20, 19, 31, 0.96); }
 html[data-theme='light'] .panel {
-  background: rgba(251, 250, 247, 0.90);
+  background: rgba(251, 250, 247, 0.96);
   border-color: rgba(0, 0, 0, 0.07);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.65),
-    0 18px 50px rgba(30, 27, 45, 0.14),
-    0 4px 14px rgba(30, 27, 45, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
+
+/* 头部 Logo（custom 图 / Mark 替换状态点显示） */
+.p-logo {
+  width: 18px; height: 18px;
+  border-radius: 5px;
+  object-fit: cover;
+  display: block;
+  flex: none;
+  cursor: pointer;
+}
+.p-logo[hidden] { display: none; }
 
 .p-head {
   height: 32px;
@@ -135,6 +142,8 @@ html[data-theme='light'] .panel {
 }
 .p-icon-btn:hover { opacity: 0.8; background: var(--surface); }
 .p-icon-btn:active { transform: scale(0.92); }
+/* display:grid 会压过 hidden 属性的 UA display:none，需显式恢复（否则更新按钮常驻） */
+.p-icon-btn[hidden] { display: none; }
 .p-icon-btn.update-btn { opacity: 0.85; color: var(--brand); min-width: 26px; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .p-icon-btn.update-btn:hover { opacity: 1; }
 
@@ -153,23 +162,12 @@ html[data-theme='light'] .panel {
   animation: tipIn var(--tr);
 }
 
-/* 行：48px，无卡片容器，发丝线分隔；入场瀑布 */
+/* 行：48px，无卡片容器，发丝线分隔；入场瀑布由 Motion.rowsIn(GSAP) 驱动 */
 .row {
   padding: 10px 16px;
   border-bottom: 1px solid var(--row-line);
   cursor: pointer;
   transition: background var(--tr), transform var(--tr);
-  animation: rowIn 260ms cubic-bezier(0.4, 0, 0.2, 1) both;
-}
-.row:nth-child(1) { animation-delay: 0ms; }
-.row:nth-child(2) { animation-delay: 30ms; }
-.row:nth-child(3) { animation-delay: 60ms; }
-.row:nth-child(4) { animation-delay: 90ms; }
-.row:nth-child(5) { animation-delay: 120ms; }
-.row:nth-child(n+6) { animation-delay: 150ms; }
-@keyframes rowIn {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: none; }
 }
 .row:hover { background: var(--brand-aura); transform: translateY(-0.5px); }
 .row:last-child { border-bottom: none; }
@@ -195,10 +193,6 @@ html[data-theme='light'] .panel {
 .card-logo.logo-broken { display: none; }
 /* lobehub 单色 logo（m-*.svg）保持官方原色黑，暗色主题反白保证可见 */
 html[data-theme='dark'] :is(.card-logo, .t-logo)[src*="/m-"] {
-  filter: invert(1);
-}
-/* 内置单色 Logo（白色标记）：浅色主题反黑保证可见，深色主题保持白 */
-html[data-theme='light'] .side .logo img[src*="logo-mono"] {
   filter: invert(1);
 }
 
@@ -282,8 +276,10 @@ html[data-theme='light'] .side .logo img[src*="logo-mono"] {
 html[data-theme='dark'] .side { background: rgba(255, 255, 255, 0.03); }
 
 .side .logo {
+  /* 沉底：logo 区贴侧边栏底部（nav 之后，DOM 亦在其后） */
+  margin-top: auto;
   display: flex; align-items: center; gap: 8px;
-  padding: 2px 12px 20px;
+  padding: 12px 12px 2px;
   font-size: 13px; font-weight: 600;
   white-space: nowrap;
 }
@@ -320,12 +316,7 @@ html[data-theme='dark'] .side { background: rgba(255, 255, 255, 0.03); }
 .view-head h1 { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
 .view-head .sub { margin-top: 4px; font-size: 12px; color: var(--text-t); font-variant-numeric: tabular-nums; }
 
-/* 视图切换淡入：hidden 移除时重放，服务于状态过渡 */
-.content > section { animation: viewIn 200ms cubic-bezier(0.16, 1, 0.3, 1); }
-@keyframes viewIn {
-  from { opacity: 0; transform: translateY(3px); }
-  to { opacity: 1; transform: none; }
-}
+/* 视图切换入场由 Motion.viewIn(GSAP) 驱动 */
 
 .btn {
   padding: 7px 14px;
@@ -371,7 +362,7 @@ html[data-theme='dark'] .side { background: rgba(255, 255, 255, 0.03); }
 .switch.sm i::after { width: 12px; height: 12px; top: 2px; left: 2px; }
 .switch.sm input:checked + i::after { transform: translateX(10px); }
 
-/* 进度条（通用）：track + 品牌填充 + 内辉光，500ms 填充动画 */
+/* 进度条（通用）：track + 品牌填充 + 内辉光；填充由 Motion.dataIn(GSAP) 驱动 */
 .bar {
   height: 4px;
   border-radius: 99px;
@@ -385,7 +376,6 @@ html[data-theme='dark'] .side { background: rgba(255, 255, 255, 0.03); }
   border-radius: 99px;
   background: var(--brand);
   box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25);
-  transition: width 500ms cubic-bezier(0, 0, 0.2, 1);
 }
 .bar.slim { height: 3px; }
 .bar.urgent-fill > i { background: var(--urgent); box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 0 8px color-mix(in srgb, var(--urgent) 50%, transparent); }
@@ -538,6 +528,28 @@ input[type='color']:hover { border-color: var(--brand); }
 .seg button:hover { color: var(--text-p); background: var(--track); }
 .seg button.active { background: var(--brand-aura); color: var(--brand); font-weight: 600; }
 
+/* Logo 预览式分段选择：图片即选项（mark 为透明底白标，统一垫深底保证可见） */
+.seg-logo button { padding: 3px; display: grid; place-items: center; }
+.seg-logo button img,
+.seg-logo .logo-plus {
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  object-fit: cover;
+  display: block;
+}
+.seg-logo button img { background: #1b1922; }
+/* display:block/grid 会压过 hidden 属性的 UA display:none，需显式恢复 */
+.seg-logo button img[hidden],
+.seg-logo .logo-plus[hidden] { display: none; }
+.seg-logo .logo-plus {
+  display: grid; place-items: center;
+  font-size: 14px; line-height: 1;
+  color: var(--text-t);
+  background: var(--surface);
+  border: 1px dashed var(--hairline);
+}
+.seg-logo button.active { background: var(--track); box-shadow: 0 0 0 1.5px var(--brand); }
+
 .icon-preview {
   width: 34px; height: 34px;
   border-radius: 8px;
@@ -573,6 +585,7 @@ input[type='color']:hover { border-color: var(--brand); }
   transition: opacity var(--tr);
 }
 .modal-mask.show { opacity: 1; pointer-events: auto; }
+/* 弹层本体 transform 交给 Motion.modalIn/Out(GSAP)；遮罩淡入淡出仍由 .show 驱动 */
 .modal {
   width: min(520px, calc(100vw - 48px));
   max-height: calc(100vh - 64px);
@@ -581,11 +594,8 @@ input[type='color']:hover { border-color: var(--brand); }
   border: 1px solid var(--brand-border);
   border-radius: 12px;
   padding: 24px;
-  transform: translateY(8px) scale(0.99);
-  transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1), opacity var(--tr);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
 }
-.modal-mask.show .modal { transform: none; }
 .modal h2 { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 24px; }
 
 .tpl-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 16px; }

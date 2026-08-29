@@ -9,6 +9,11 @@
 <body>
   <div class="app">
     <aside class="side">
+      <nav>
+        <button data-view="plans" class="active">套餐</button>
+        <button data-view="settings">设置</button>
+        <button data-view="about">关于</button>
+      </nav>
       <div class="logo" id="logo">
         <span class="brand-dot" id="logo-dot"></span>
         <span class="logo-text">Plan Limit</span>
@@ -17,11 +22,6 @@
           <i class="side-pulse"></i>
         </button>
       </div>
-      <nav>
-        <button data-view="plans" class="active">套餐</button>
-        <button data-view="settings">设置</button>
-        <button data-view="about">关于</button>
-      </nav>
     </aside>
 
     <main class="content">
@@ -126,12 +126,13 @@
           <div class="set-row">
             <div class="label">Logo</div>
             <div class="setting-ctl">
-              <img id="icon-preview" class="icon-preview" alt="" hidden />
-              <div class="seg" id="seg-logo-style">
-                <button data-v="color">原色</button>
-                <button data-v="mono">单色</button>
-                <button data-v="mark">Mark</button>
-                <button data-v="custom">自定义</button>
+              <div class="seg seg-logo" id="seg-logo-style">
+                <button data-v="color" title="原色"><img src="icons/app.png" alt="原色" /></button>
+                <button data-v="mark" title="Mark"><img src="icons/app-mark.png" alt="Mark" /></button>
+                <button data-v="custom" title="自定义">
+                  <img id="custom-logo-thumb" alt="自定义" hidden />
+                  <span id="custom-logo-plus" class="logo-plus" aria-hidden="true">+</span>
+                </button>
               </div>
               <button id="btn-icon-pick" class="btn ghost" hidden>选择图片</button>
             </div>
@@ -250,6 +251,8 @@
     </div>
   </div>
 
+  <script src="vendor/gsap.min.js"></script>
+  <script src="js/motion.js"></script>
   <script src="js/common.js"></script>
   <script src="js/app.js"></script>
 </body>
