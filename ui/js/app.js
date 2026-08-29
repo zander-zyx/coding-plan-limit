@@ -459,14 +459,16 @@ function renderSettings() {
       saveSettings({ popup_plan_ids: ids });
     }));
 
+  const logoStyle = s.custom_icon ? 'custom' : (s.logo_style || 'color');
+  $('seg-logo-style').querySelectorAll('button').forEach((b) =>
+    b.classList.toggle('active', b.dataset.v === logoStyle));
+  $('btn-icon-pick').hidden = logoStyle !== 'custom';
   const preview = $('icon-preview');
   if (s.custom_icon) {
     preview.src = s.custom_icon;
     preview.hidden = false;
-    $('btn-icon-reset').hidden = false;
   } else {
     preview.hidden = true;
-    $('btn-icon-reset').hidden = true;
   }
 }
 
@@ -524,8 +526,8 @@ $('accent-hex').addEventListener('change', (e) => {
 });
 $('accent-reset').addEventListener('click', () => saveSettings({ accent: null }).then(renderSettings));
 
-// ─── 托盘图标自定义 ───────────────────────────────────────────
-$('btn-icon-pick').addEventListener('click', () => {
+// ─── Logo（原色 / 单色 / 自定义图片，托盘+标题栏+侧边栏同步） ──
+function pickLogoImage() {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/png,image/jpeg,image/webp,image/*';
@@ -554,14 +556,22 @@ $('btn-icon-pick').addEventListener('click', () => {
     reader.readAsDataURL(file);
   };
   input.click();
-});
+}
 
-$('btn-icon-reset').addEventListener('click', async () => {
+$('btn-icon-pick').addEventListener('click', pickLogoImage);
+
+$('seg-logo-style').addEventListener('click', async (e) => {
+  const v = e.target.dataset?.v;
+  if (!v) return;
   try {
-    await invoke('reset_custom_icon');
-    await reload();
-  } catch (e) {
-    toast(String(e));
+    if (v === 'custom' && !state.settings?.custom_icon) {
+      pickLogoImage(); // 尚无自定义图片：选图成功后经 set_custom_icon 落为 custom
+    } else {
+      await invoke('set_logo_style', { style: v });
+      await reload();
+    }
+  } catch (err) {
+    toast(String(err));
   }
 });
 
@@ -624,15 +634,16 @@ function renderSideLogo() {
   const logo = $('logo');
   const dot = $('logo-dot');
   const custom = state.settings?.custom_icon;
+  const mono = !custom && state.settings?.logo_style === 'mono';
   let img = logo.querySelector('img.side-logo-img');
-  if (custom) {
+  if (custom || mono) {
     dot.style.display = 'none';
     if (!img) {
       img = document.createElement('img');
       img.className = 'side-logo-img';
       logo.prepend(img);
     }
-    img.src = custom;
+    img.src = custom || 'icons/logo-mono.png';
   } else {
     dot.style.display = '';
     img?.remove();

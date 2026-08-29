@@ -171,6 +171,13 @@ pub struct Settings {
     /// 自定义托盘图标（PNG dataURL；None = 使用内置默认图标）
     #[serde(default)]
     pub custom_icon: Option<String>,
+    /// Logo 样式：color（原色，默认）| mono（单色白，适配深色任务栏）；custom_icon 存在时按 custom 处理
+    #[serde(default = "default_logo_style")]
+    pub logo_style: String,
+}
+
+fn default_logo_style() -> String {
+    "color".to_string()
 }
 
 fn default_theme() -> String {
@@ -208,6 +215,7 @@ impl Default for Settings {
             popup_plan_ids: Vec::new(),
             accent: None,
             bar_style: default_bar_style(),
+            logo_style: default_logo_style(),
             auto_check_update: true,
         }
     }

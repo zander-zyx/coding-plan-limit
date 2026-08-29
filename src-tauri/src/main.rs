@@ -48,6 +48,7 @@ fn main() {
             commands::popup_size_changed,
             commands::quit_app,
             commands::set_custom_icon,
+            commands::set_logo_style,
             commands::reset_custom_icon,
             commands::get_config_dir,
             commands::open_external,
@@ -66,19 +67,29 @@ fn main() {
                 }
             }
 
-            // 应用自定义托盘图标（同时同步主窗口标题栏图标）
-            if let Some(data_url) = store::load_settings(app.handle()).custom_icon {
-                if let Some(payload) = data_url.strip_prefix("data:image/png;base64,") {
-                    if let Ok(raw) = base64::Engine::decode(
-                        &base64::engine::general_purpose::STANDARD,
-                        payload,
-                    ) {
-                        if let Ok(img) = tauri::image::Image::from_bytes(&raw[..]) {
-                            commands::apply_tray_icon(app.handle(), img.clone());
-                            if let Some(win) = app.get_webview_window("main") {
-                                let _ = win.set_icon(img);
-                            }
-                        }
+            // 应用 Logo（自定义 > 单色 > 默认原色），同步托盘 + 主窗口标题栏图标
+            {
+                let settings = store::load_settings(app.handle());
+                let img = if let Some(data_url) = settings.custom_icon {
+                    data_url
+                        .strip_prefix("data:image/png;base64,")
+                        .and_then(|payload| {
+                            base64::Engine::decode(
+                                &base64::engine::general_purpose::STANDARD,
+                                payload,
+                            )
+                            .ok()
+                        })
+                        .and_then(|raw| tauri::image::Image::from_bytes(&raw[..]).ok())
+                } else if settings.logo_style == "mono" {
+                    tauri::image::Image::from_bytes(commands::LOGO_MONO).ok()
+                } else {
+                    None
+                };
+                if let Some(img) = img {
+                    commands::apply_tray_icon(app.handle(), img.clone());
+                    if let Some(win) = app.get_webview_window("main") {
+                        let _ = win.set_icon(img);
                     }
                 }
             }

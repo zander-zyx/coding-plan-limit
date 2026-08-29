@@ -22,7 +22,6 @@
         <button data-view="settings">设置</button>
         <button data-view="about">关于</button>
       </nav>
-      <div class="side-foot">v<span id="side-version"></span><br />数据仅存本地</div>
     </aside>
 
     <main class="content">
@@ -31,7 +30,7 @@
         <div class="view-head">
           <div>
             <h1>套餐</h1>
-            <div class="sub" id="plans-sub">—</div>
+            <div class="sub" id="plans-sub">…</div>
           </div>
           <button id="btn-add" class="btn">＋ 添加套餐</button>
         </div>
@@ -81,7 +80,7 @@
             <div class="label">自动刷新间隔</div>
             <div class="setting-ctl">
               <input type="number" id="in-refresh" min="10" max="86400" step="5" />
-              <span style="font-size:11px;color:var(--text-t)">秒</span>
+              <span style="font-size:12px;color:var(--text-t)">秒</span>
             </div>
           </div>
           <div class="set-row">
@@ -98,14 +97,14 @@
             <div class="label">重复提醒间隔</div>
             <div class="setting-ctl">
               <input type="number" id="in-notify-interval" min="1" max="10080" />
-              <span style="font-size:11px;color:var(--text-t)">分钟</span>
+              <span style="font-size:12px;color:var(--text-t)">分钟</span>
             </div>
           </div>
           <div class="set-row" id="row-notify-count" hidden>
             <div class="label">提醒频率（次数）</div>
             <div class="setting-ctl">
               <input type="number" id="in-notify-count" min="1" max="1000" />
-              <span style="font-size:11px;color:var(--text-t)">次刷新</span>
+              <span style="font-size:12px;color:var(--text-t)">次刷新</span>
             </div>
           </div>
         </div>
@@ -125,11 +124,15 @@
             </div>
           </div>
           <div class="set-row">
-            <div class="label">托盘图标</div>
+            <div class="label">Logo</div>
             <div class="setting-ctl">
               <img id="icon-preview" class="icon-preview" alt="" hidden />
-              <button id="btn-icon-pick" class="btn ghost">选择图片</button>
-              <button id="btn-icon-reset" class="txt-btn" hidden>恢复默认</button>
+              <div class="seg" id="seg-logo-style">
+                <button data-v="color">原色</button>
+                <button data-v="mono">单色</button>
+                <button data-v="custom">自定义</button>
+              </div>
+              <button id="btn-icon-pick" class="btn ghost" hidden>选择图片</button>
             </div>
           </div>
         </div>
@@ -140,13 +143,13 @@
         <div class="view-head">
           <div>
             <h1>关于</h1>
-            <div class="sub">Plan Limit <span id="about-version">v—</span></div>
+            <div class="sub">Plan Limit <span id="about-version">v…</span></div>
           </div>
         </div>
         <div class="sec">
           <div class="sec-title">更新</div>
           <div class="set-row">
-            <div class="label">检查更新</div>
+            <div class="label">版本</div>
             <div class="setting-ctl"><button id="btn-check-update" class="btn ghost">检查更新</button></div>
           </div>
           <div class="set-row">
@@ -158,7 +161,7 @@
           <div class="sec-title">数据</div>
           <div class="set-row">
             <div class="label">数据目录</div>
-            <div class="setting-ctl" style="max-width:320px;overflow:hidden;text-overflow:ellipsis"><span style="font-size:11px;color:var(--text-t)" id="config-dir">—</span></div>
+            <div class="setting-ctl" style="max-width:320px;overflow:hidden;text-overflow:ellipsis"><span style="font-size:12px;color:var(--text-t)" id="config-dir">…</span></div>
           </div>
         </div>
       </section>

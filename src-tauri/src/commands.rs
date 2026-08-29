@@ -279,7 +279,10 @@ pub fn get_config_dir(app: AppHandle) -> Result<String, String> {
     store::config_dir(&app).map(|p| p.to_string_lossy().into_owned())
 }
 
-// ─── 自定义托盘图标 ────────────────────────────────────────────────────────
+// ─── Logo（托盘 / 主窗口 / 侧边栏同步） ────────────────────────────────────
+
+/// 内置单色 Logo（白色标记 + 透明底，适配深色任务栏）
+pub static LOGO_MONO: &[u8] = include_bytes!("../../ui/icons/logo-mono.png");
 
 /// 前端把用户选择的图片画成 PNG dataURL 后提交；Rust 解码并实时更换托盘图标
 #[tauri::command]
@@ -302,6 +305,41 @@ pub fn set_custom_icon(app: AppHandle, data_url: String) -> Result<(), String> {
 
     store::update_config(&app, |config| {
         config.settings.custom_icon = Some(data_url);
+        config.settings.logo_style = "custom".into();
+    })?;
+    Ok(())
+}
+
+/// 切换内置 Logo：color（原色）| mono（单色白）| custom（仅落盘，配合 set_custom_icon 使用）
+#[tauri::command]
+pub fn set_logo_style(app: AppHandle, style: String) -> Result<(), String> {
+    match style.as_str() {
+        "color" => {
+            let default_icon = app
+                .default_window_icon()
+                .expect("缺少应用图标")
+                .clone();
+            apply_tray_icon(&app, default_icon.clone());
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.set_icon(default_icon);
+            }
+        }
+        "mono" => {
+            let img = tauri::image::Image::from_bytes(LOGO_MONO)
+                .map_err(|e| format!("单色 Logo 解析失败: {e}"))?;
+            apply_tray_icon(&app, img.clone());
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.set_icon(img);
+            }
+        }
+        "custom" => {}
+        _ => return Err(format!("未知 Logo 样式: {style}")),
+    }
+    store::update_config(&app, |config| {
+        config.settings.logo_style = style;
+        if config.settings.custom_icon.is_some() && config.settings.logo_style != "custom" {
+            config.settings.custom_icon = None;
+        }
     })?;
     Ok(())
 }
@@ -319,6 +357,7 @@ pub fn reset_custom_icon(app: AppHandle) -> Result<(), String> {
     }
     store::update_config(&app, |config| {
         config.settings.custom_icon = None;
+        config.settings.logo_style = "color".into();
     })?;
     Ok(())
 }
