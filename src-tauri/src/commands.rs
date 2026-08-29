@@ -258,9 +258,13 @@ pub fn set_custom_icon(app: AppHandle, data_url: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn reset_custom_icon(app: AppHandle) -> Result<(), String> {
-    if let Some(tray) = app.tray_by_id("main-tray") {
-        if let Some(default_icon) = app.default_window_icon() {
+    if let Some(default_icon) = app.default_window_icon() {
+        // 托盘与主窗口（任务栏）同步恢复默认
+        if let Some(tray) = app.tray_by_id("main-tray") {
             let _ = tray.set_icon(Some(default_icon.clone()));
+        }
+        if let Some(win) = app.get_webview_window("main") {
+            let _ = win.set_icon(default_icon.clone());
         }
     }
     store::update_config(&app, |config| {

@@ -210,13 +210,13 @@ function rowHtml(view, opts = {}) {
   if (urgent) rightCls = 'urgent';
 
   const tipLine = tip ? `<div class="row-tip">${esc(tip)}</div>` : '';
-  const actions = opts.actions || '';
+  const lead = opts.lead || '';
   const logo = logoHtml(view);
 
   return `
   <div class="row ${opts.sub ? 'row-sub' : ''} ${urgent ? 'row-urgent' : ''}" data-template="${esc(view.plan.template)}">
     <div class="row-main">
-      ${actions ? `<div class="row-lead">${actions}</div>` : ''}
+      ${lead ? `<div class="row-lead">${lead}</div>` : ''}
       <div class="row-icon">${logo}</div>
       <div class="row-body">
         <div class="row-top">
@@ -225,6 +225,7 @@ function rowHtml(view, opts = {}) {
         </div>
         ${lines}
       </div>
+      ${actions ? `<div class="row-tail">${actions}</div>` : ''}
     </div>
     ${tipLine}
   </div>`;

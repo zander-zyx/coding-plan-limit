@@ -37,15 +37,18 @@ function renderPlans() {
     return;
   }
   box.innerHTML = state.views.map((v) => {
-    const actions = `
-      <div class="row-actions">
+    const lead = `
+      <div class="row-lead">
         <label class="switch sm" title="启用/停用">
           <input type="checkbox" data-toggle="${v.plan.id}" ${v.plan.enabled ? 'checked' : ''} /><i></i>
         </label>
+      </div>`;
+    const actions = `
+      <div class="row-actions">
         <button class="txt-btn" data-edit="${v.plan.id}">编辑</button>
         <button class="txt-btn" data-del="${v.plan.id}">删除</button>
       </div>`;
-    return rowHtml(v, { actions, hideHeadPct: true });
+    return rowHtml(v, { lead, actions, hideHeadPct: true });
   }).join('');
   animateBars(box);
 

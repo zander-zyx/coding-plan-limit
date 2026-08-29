@@ -173,6 +173,11 @@ html[data-theme='light'] .panel { background: rgba(250, 248, 245, 0.86); }
 .row-icon .card-logo { width: 14px; height: 14px; }
 .row-icon .tpl-glyph { width: 6px; height: 6px; border-radius: 2px; transform: rotate(45deg); }
 .card-logo.logo-broken { display: none; }
+/* Z.ai logo 保持官方原色黑，暗色主题反白保证可见 */
+html[data-theme='dark'] .card-logo[src$="icons/zai.svg"],
+html[data-theme='dark'] .t-logo[src$="icons/zai.svg"] {
+  filter: invert(1);
+}
 
 .row-body { flex: 1; min-width: 0; }
 .row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
@@ -324,9 +329,9 @@ html[data-theme='dark'] .side { background: rgba(255, 255, 255, 0.02); }
   transition: opacity var(--tr);
   flex: none;
 }
-.row-lead { flex: none; display: flex; align-items: center; gap: 2px; }
-.row-lead .row-actions { opacity: 0.85; }
-.row:hover .row-lead .row-actions, .row:hover .row-actions, .row:focus-within .row-actions { opacity: 1; }
+.row-tail { flex: none; margin-left: 8px; }
+.row-tail .row-actions { opacity: 0.85; }
+.row:hover .row-tail .row-actions, .row:hover .row-actions, .row:focus-within .row-actions { opacity: 1; }
 
 /* 小号开关（行内控制用） */
 .switch.sm { width: 26px; height: 16px; }
