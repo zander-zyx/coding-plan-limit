@@ -1,5 +1,5 @@
 // 托盘悬停弹窗：48px 行 + hover 详情 + More 折叠 + 底部相对时间
-// 头部仅状态点 + 齿轮；打开时后端已节流刷新
+// 头部：状态点（点击关闭）+ 齿轮；打开时后端已节流刷新
 const list = document.getElementById('list');
 const updatedEl = document.getElementById('updated');
 const statusDot = document.getElementById('status-dot');
@@ -120,6 +120,9 @@ list.addEventListener('click', (e) => {
 });
 
 document.getElementById('btn-settings').addEventListener('click', () => invoke('open_main'));
+
+// 状态点：点击关闭弹窗（Windows 悬停驱动，重入托盘会再次打开）
+statusDot.addEventListener('click', () => invoke('hide_popup').catch(() => {}));
 
 // ─── 更新按钮（仅在有新版本时出现在头部） ─────────────────────
 let updateUrl = null;

@@ -24,20 +24,30 @@ const HIDE_DELAY_MS: u64 = 600;
 /// 弹窗附近的判定边距（物理像素）：从托盘移向弹窗的途中不算"移出"
 const HIDE_MARGIN: f64 = 48.0;
 
-/// Windows：给弹窗窗口设置 DWM 圆角（Mica/Acrylic 效果层不会自动圆角）
+/// Windows：给弹窗窗口设置 DWM 圆角（Mica/Acrylic 效果层不会自动圆角），
+/// 并隐藏 DWM 附带的 1px 系统边框——DWM 圆角(8px)小于 CSS 面板圆角(24px)，
+/// 系统边框会在四个角以"幽灵框"形态露出。
 #[cfg(windows)]
 pub fn round_popup_corners(app: &AppHandle) {
     use windows_sys::Win32::Graphics::Dwm::{
-        DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
+        DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_COLOR_NONE,
+        DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
     };
     if let Some(win) = app.get_webview_window("popup") {
         if let Ok(hwnd) = win.hwnd() {
-            let pref = DWMWCP_ROUND as u32;
             unsafe {
+                let pref = DWMWCP_ROUND as u32;
                 let _ = DwmSetWindowAttribute(
                     hwnd.0,
                     DWMWA_WINDOW_CORNER_PREFERENCE as u32,
                     &pref as *const u32 as *const core::ffi::c_void,
+                    4,
+                );
+                let none = DWMWA_COLOR_NONE;
+                let _ = DwmSetWindowAttribute(
+                    hwnd.0,
+                    DWMWA_BORDER_COLOR as u32,
+                    &none as *const u32 as *const core::ffi::c_void,
                     4,
                 );
             }

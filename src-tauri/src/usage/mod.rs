@@ -32,7 +32,7 @@ pub fn templates() -> Vec<Template> {
             quota_type: "windows".into(),
             has_region: true,
             needs_base_url: false,
-            homepage: "https://platform.minimaxi.com".into(),
+            homepage: "https://platform.minimaxi.com/console/usage".into(),
         },
         Template {
             id: "zhipu".into(),
@@ -42,7 +42,7 @@ pub fn templates() -> Vec<Template> {
             quota_type: "windows".into(),
             has_region: true,
             needs_base_url: true,
-            homepage: "https://open.bigmodel.cn".into(),
+            homepage: "https://bigmodel.cn/coding-plan/personal/usage".into(),
         },
         Template {
             id: "kimi-coding".into(),
@@ -52,7 +52,7 @@ pub fn templates() -> Vec<Template> {
             quota_type: "windows".into(),
             has_region: false,
             needs_base_url: false,
-            homepage: "https://www.kimi.com/coding".into(),
+            homepage: "https://www.kimi.com/code/console".into(),
         },
         Template {
             id: "claude-official".into(),
@@ -102,7 +102,7 @@ pub fn templates() -> Vec<Template> {
             quota_type: "balance".into(),
             has_region: true,
             needs_base_url: false,
-            homepage: "https://platform.stepfun.com".into(),
+            homepage: "https://platform.stepfun.com/plan-subscribe".into(),
         },
         Template {
             id: "siliconflow".into(),

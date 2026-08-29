@@ -10,14 +10,14 @@ const listen = Tauri.event.listen;
 
 // ─── 模板元数据 ────────────────────────────────────────────────
 const PROVIDER_META = {
-  minimax:        { name: 'MiniMax',       color: '#ff5b4a', icon: 'icons/minimax-color.svg', homepage: 'https://platform.minimaxi.com' },
-  zhipu:          { name: '智谱 GLM',      color: '#3f7cff', icon: 'icons/m-zai.svg', homepage: 'https://open.bigmodel.cn' },
-  'kimi-coding':  { name: 'Kimi Coding',   color: '#16c8b7', icon: 'icons/kimi-color.png', homepage: 'https://www.kimi.com/code' },
+  minimax:        { name: 'MiniMax',       color: '#ff5b4a', icon: 'icons/minimax-color.svg', homepage: 'https://platform.minimaxi.com/console/usage' },
+  zhipu:          { name: '智谱 GLM',      color: '#3f7cff', icon: 'icons/m-zai.svg', homepage: 'https://bigmodel.cn/coding-plan/personal/usage' },
+  'kimi-coding':  { name: 'Kimi Coding',   color: '#16c8b7', icon: 'icons/kimi-color.png', homepage: 'https://www.kimi.com/code/console' },
   'claude-official': { name: 'Claude',     color: '#d97757', icon: 'icons/claude-color.svg', homepage: 'https://claude.ai' },
   codex:          { name: 'Codex',         color: '#10a37f', icon: 'icons/m-openai.svg', homepage: 'https://chatgpt.com' },
   deepseek:       { name: 'DeepSeek',      color: '#4d6bfe', icon: 'icons/deepseek-color.svg', homepage: 'https://platform.deepseek.com' },
   kimi:           { name: 'Kimi',          color: '#0ea5a3', icon: 'icons/kimi-color.png', homepage: 'https://platform.moonshot.cn' },
-  stepfun:        { name: '阶跃星辰',      color: '#8b5cf6', icon: 'icons/stepfun-color.svg', homepage: 'https://platform.stepfun.com' },
+  stepfun:        { name: '阶跃星辰',      color: '#8b5cf6', icon: 'icons/stepfun-color.svg', homepage: 'https://platform.stepfun.com/plan-subscribe' },
   siliconflow:    { name: '硅基流动',      color: '#6366f1', icon: 'icons/siliconcloud-color.svg', homepage: 'https://cloud.siliconflow.cn' },
   newapi:         { name: 'NewAPI',        color: '#38bdf8', icon: 'icons/newapi.png', homepage: '' },
   sub2api:        { name: 'Sub2API',       color: '#94a3b8', icon: 'icons/sub2api.svg', homepage: '' },

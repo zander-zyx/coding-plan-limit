@@ -113,8 +113,13 @@ html[data-theme='light'] .panel {
   width: 6px; height: 6px;
   border-radius: 50%;
   display: inline-block;
-  transition: background var(--tr);
+  position: relative;
+  cursor: pointer;
+  transition: background var(--tr), transform var(--tr);
 }
+/* 6px 点太小：::after 扩展为 24px 点击热区（点击关闭弹窗） */
+.status-dot::after { content: ''; position: absolute; inset: -9px; }
+.status-dot:hover { transform: scale(1.35); }
 .status-dot.ok { background: var(--ok); box-shadow: 0 0 6px color-mix(in srgb, var(--ok) 60%, transparent); }
 .status-dot.warn { background: var(--warn); box-shadow: 0 0 8px color-mix(in srgb, var(--warn) 70%, transparent); animation: dotPulse 2s ease-in-out infinite; }
 @keyframes dotPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
