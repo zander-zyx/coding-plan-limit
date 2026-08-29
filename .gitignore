@@ -6,5 +6,6 @@ dist/
 .DS_Store
 .playwright-mcp/
 *.png
+!ui/icons/*.png
 !src-tauri/icons/**
 !assets/**
