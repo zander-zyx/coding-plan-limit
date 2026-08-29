@@ -23,8 +23,8 @@ const PROVIDER_META = {
   siliconflow:    { name: '硅基流动',      color: '#6366f1', icon: 'icons/m-siliconcloud.svg', homepage: 'https://cloud.siliconflow.cn' },
   alibaba:        { name: '阿里云',        color: '#f59e0b', icon: 'icons/m-alibabacloud.svg', homepage: 'https://bailian.console.aliyun.com' },
   packycode:      { name: 'PackyCode',     color: '#7c5cff', icon: 'icons/packycode.svg', homepage: 'https://www.packyapi.ai' },
-  newapi:         { name: 'NewAPI',        color: '#38bdf8', icon: '', homepage: '' },
-  sub2api:        { name: 'Sub2API',       color: '#94a3b8', icon: '', homepage: '' },
+  newapi:         { name: 'NewAPI',        color: '#38bdf8', icon: 'icons/newapi.png', homepage: '' },
+  sub2api:        { name: 'Sub2API',       color: '#94a3b8', icon: 'icons/sub2api.svg', homepage: '' },
 };
 
 // ─── 主题 / 设置 ───────────────────────────────────────────────
