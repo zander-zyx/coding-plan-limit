@@ -144,6 +144,13 @@ function logoHtml(view) {
  * @param opts.actions 主窗口行右侧控制区（开关/编辑/删除）
  * @param opts.main    主窗口模式：附加深色窗口明细行
  */
+/** 规范：窗口排序 5小时 → 周 → 月 → MCP/其他 */
+const WIN_ORDER = { '5小时': 0, '5 Hour': 0, '本周': 1, '周': 1, 'Weekly': 1, '本月': 2, '月': 2, '30天': 2, 'Monthly': 2, '总额度': 0 };
+function winPriority(w) {
+  const key = Object.keys(WIN_ORDER).find((k) => w.label.toLowerCase() === k.toLowerCase());
+  return key !== undefined ? WIN_ORDER[key] : 9;
+}
+
 function rowHtml(view, opts = {}) {
   const snap = view.snapshot;
   let right = '—';
@@ -159,7 +166,7 @@ function rowHtml(view, opts = {}) {
   } else {
     const q = snap.quota;
     if (q.kind === 'windows') {
-      const wins = q.windows;
+      const wins = [...q.windows].sort((a, b) => winPriority(a) - winPriority(b));
       const worst = wins.reduce((a, w) => Math.max(a, w.used_percent), 0);
       right = `${worst.toFixed(worst < 10 ? 1 : 0)}%`;
       urgent = isUrgent(worst);
