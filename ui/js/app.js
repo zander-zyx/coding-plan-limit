@@ -157,9 +157,9 @@ function setupDrag(box) {
 // 品牌短名（模板卡与默认套餐名）
 const SHORT_LABEL = {
   minimax: 'MiniMax', zhipu: '智谱GLM', 'kimi-coding': 'Kimi', 'claude-official': 'Claude',
-  codex: 'Codex', 'claude-cache': 'Claude 缓存', xiaomi: '小米', deepseek: 'DeepSeek',
-  kimi: 'Kimi', stepfun: '阶跃', siliconflow: '硅基流动', alibaba: '阿里云',
-  packycode: 'PackyCode', newapi: 'NewAPI', sub2api: 'Sub2API',
+  codex: 'Codex', deepseek: 'DeepSeek',
+  kimi: 'Kimi', stepfun: '阶跃', siliconflow: '硅基流动',
+  newapi: 'NewAPI', sub2api: 'Sub2API',
 };
 const shortLabel = (id) => SHORT_LABEL[id] || (PROVIDER_META[id] || {}).name || id;
 
@@ -213,9 +213,7 @@ function renderFormFields() {
   $('f-baseurl-item').hidden = !t.needs_base_url;
   $('f-baseurl-hint').textContent = t.id === 'zhipu'
     ? '默认 https://open.bigmodel.cn/api，国际站 https://api.z.ai/api'
-    : t.id === 'packycode'
-      ? '默认 https://www.packyapi.ai，其他中转站填对应地址'
-      : '必填，例如 https://your-newapi-site.com';
+    : '必填，例如 https://your-newapi-site.com';
 
   $('f-threshold-label').textContent =
     t.quota_type === 'balance' ? '余额提醒下限' : '提醒阈值（剩余 %）';

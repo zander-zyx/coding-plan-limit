@@ -1,16 +1,13 @@
 //! 套餐查询统一入口：内置模板注册表 + 按模板分发查询。
 //! 移植自 claude-mini-hud src/usage.ts，并对齐 cc-switch 的实现细节。
 
-pub mod alibaba;
 pub mod balances;
-pub mod claude_cache;
 pub mod http;
 pub mod kimi_coding;
 pub mod minimax;
 pub mod newapi;
 pub mod official;
 pub mod types;
-pub mod xiaomi;
 pub mod zhipu;
 
 use types::{PlanConfig, Quota, Snapshot, Template};
@@ -78,26 +75,6 @@ pub fn templates() -> Vec<Template> {
             homepage: "https://chatgpt.com".into(),
         },
         Template {
-            id: "claude-cache".into(),
-            name: "Claude (via claude-mini-hud)".into(),
-            description: "读取 claude-mini-hud 本地缓存的 5h / 7天 限额".into(),
-            auth: "none".into(),
-            quota_type: "windows".into(),
-            has_region: false,
-            needs_base_url: false,
-            homepage: "https://claude.ai".into(),
-        },
-        Template {
-            id: "xiaomi".into(),
-            name: "小米 MiMo Token Plan".into(),
-            description: "月度固定额度，推荐浏览器 Cookie 认证".into(),
-            auth: "cookie".into(),
-            quota_type: "fixed".into(),
-            has_region: false,
-            needs_base_url: false,
-            homepage: "https://platform.xiaomimimo.com".into(),
-        },
-        Template {
             id: "deepseek".into(),
             name: "DeepSeek".into(),
             description: "账户余额（按量计费）".into(),
@@ -138,26 +115,6 @@ pub fn templates() -> Vec<Template> {
             homepage: "https://cloud.siliconflow.cn".into(),
         },
         Template {
-            id: "alibaba".into(),
-            name: "阿里云 DashScope".into(),
-            description: "账户余额，需阿里云主账号 AK（BSS OpenAPI）".into(),
-            auth: "bss".into(),
-            quota_type: "balance".into(),
-            has_region: false,
-            needs_base_url: false,
-            homepage: "https://bailian.console.aliyun.com".into(),
-        },
-        Template {
-            id: "packycode".into(),
-            name: "PackyCode".into(),
-            description: "余额（币种跟随站点后台显示设置）".into(),
-            auth: "bearer".into(),
-            quota_type: "balance".into(),
-            has_region: false,
-            needs_base_url: true,
-            homepage: "https://www.packyapi.ai".into(),
-        },
-        Template {
             id: "newapi".into(),
             name: "NewAPI / OneAPI 站点".into(),
             description: "填站点地址；币种跟随站点后台设置".into(),
@@ -196,38 +153,20 @@ pub async fn query(plan: &PlanConfig, cred: &Credential) -> Result<Quota, String
         "kimi-coding" => kimi_coding::query(require(cred.bearer.as_deref(), "API Key")?).await,
         "claude-official" => official::claude().await,
         "codex" => official::codex().await,
-        "claude-cache" => claude_cache::query().await,
-        "xiaomi" => xiaomi::query(cred.cookie.as_deref(), cred.bearer.as_deref()).await,
         "deepseek" => balances::deepseek(require(cred.bearer.as_deref(), "API Key")?).await,
         "kimi" => balances::kimi(region, require(cred.bearer.as_deref(), "API Key")?).await,
         "stepfun" => balances::stepfun(region, require(cred.bearer.as_deref(), "API Key")?).await,
         "siliconflow" => {
             balances::siliconflow(region, require(cred.bearer.as_deref(), "API Key")?).await
         }
-        "alibaba" => {
-            alibaba::query(
-                require(cred.ak_id.as_deref(), "AccessKey ID")?,
-                require(cred.ak_secret.as_deref(), "AccessKey Secret")?,
-            )
-            .await
-        }
         // NewAPI 系（OpenAI 兼容计费接口）
-        "packycode" | "newapi" => {
-            let base = match plan.template.as_str() {
-                // packycode 未填地址时使用官方默认
-                "packycode" => plan
-                    .base_url
-                    .as_deref()
-                    .map(str::trim)
-                    .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("default"))
-                    .unwrap_or("https://www.packyapi.ai"),
-                _ => plan
-                    .base_url
-                    .as_deref()
-                    .map(str::trim)
-                    .filter(|s| !s.is_empty())
-                    .ok_or("请在套餐配置中填写站点 API 地址")?,
-            };
+        "newapi" => {
+            let base = plan
+                .base_url
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .ok_or("请在套餐配置中填写站点 API 地址")?;
             newapi::query(base, require(cred.bearer.as_deref(), "API Key")?).await
         }
         // Sub2API：CC Switch 同款 /v1/usage 提取器语义
