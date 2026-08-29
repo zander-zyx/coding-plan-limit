@@ -433,15 +433,41 @@ input[type='color'] {
 input[type='color']::-webkit-color-swatch-wrapper { padding: 0; }
 input[type='color']::-webkit-color-swatch { border: none; border-radius: 5px; }
 input[type='color']:hover { border-color: var(--brand); }
+/* 主题色预设：独立浮动色点（不复用 seg 分段条），间距留白 + 立体质感 */
+.swatch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 4px;
+}
 .accent-swatch {
-  width: 20px; height: 20px;
-  border-radius: 6px;
+  width: 22px; height: 22px;
+  border-radius: 7px;
   border: none;
   padding: 0;
+  flex: none;
   transition: transform var(--tr), box-shadow var(--tr);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.38),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.14),
+    0 1px 2px rgba(6, 8, 18, 0.20);
 }
-.accent-swatch:hover { transform: scale(1.12); }
-.accent-swatch.active { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--brand); }
+.accent-swatch:hover {
+  transform: translateY(-1px) scale(1.12);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.38),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.14),
+    0 3px 7px rgba(6, 8, 18, 0.28);
+}
+.accent-swatch:active { transform: scale(0.94); }
+.accent-swatch.active {
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.38),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.14),
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--brand),
+    0 1px 3px rgba(6, 8, 18, 0.22);
+}
 .hex-input {
   width: 84px !important;
   text-align: center;
