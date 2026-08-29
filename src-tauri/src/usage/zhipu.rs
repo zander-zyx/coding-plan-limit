@@ -67,7 +67,7 @@ pub async fn query(region: &str, base_url: Option<&str>, bearer: &str) -> Result
         if is_quota(typ) && unit == 3 {
             windows.push(WindowQuota { label: "5小时".into(), used_percent: pct, reset_at: reset });
         } else if is_quota(typ) && unit == 6 {
-            windows.push(WindowQuota { label: "本周".into(), used_percent: pct, reset_at: reset });
+            windows.push(WindowQuota { label: "7天".into(), used_percent: pct, reset_at: reset });
         } else if typ == "TIME_LIMIT" {
             windows.push(WindowQuota { label: "MCP".into(), used_percent: pct, reset_at: None });
         } else if is_quota(typ) && !monthly_done {

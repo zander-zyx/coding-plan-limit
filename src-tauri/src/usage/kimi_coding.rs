@@ -35,7 +35,7 @@ pub async fn query(bearer: &str) -> Result<Quota, String> {
         let used = (limit - remaining).max(0.0);
         let pct = if limit > 0.0 { used / limit * 100.0 } else { 0.0 };
         windows.push(WindowQuota {
-            label: "本周".into(),
+            label: "7天".into(),
             used_percent: pct.clamp(0.0, 100.0),
             reset_at: ms_to_secs(f64_of(usage, "resetTime")),
         });

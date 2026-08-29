@@ -41,7 +41,7 @@ pub async fn query(region: &str, bearer: &str) -> Result<Quota, String> {
         }
     };
     push("5小时", "current_interval_remaining_percent", "end_time");
-    push("本周", "current_weekly_remaining_percent", "weekly_end_time");
+    push("7天", "current_weekly_remaining_percent", "weekly_end_time");
     push("本月", "current_monthly_remaining_percent", "monthly_end_time");
 
     if windows.is_empty() {

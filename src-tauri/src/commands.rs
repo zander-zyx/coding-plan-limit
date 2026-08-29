@@ -200,6 +200,30 @@ pub fn quit_app(app: AppHandle) {
     app.exit(0);
 }
 
+/// 拖拽排序：按前端传来的 id 顺序重排（未列出的套餐保持相对顺序排在后面）
+#[tauri::command]
+pub fn reorder_plans(app: AppHandle, ids: Vec<String>) -> Result<(), String> {
+    store::update_config(&app, |config| {
+        let mut rank = std::collections::HashMap::new();
+        for (i, id) in ids.iter().enumerate() {
+            rank.insert(id.clone(), i);
+        }
+        config.plans.sort_by(|a, b| {
+            let ra = rank.get(&a.id).copied();
+            let rb = rank.get(&b.id).copied();
+            match (ra, rb) {
+                (Some(x), Some(y)) => x.cmp(&y),
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                // 都未列出：按原有 created_at 相对顺序
+                (None, None) => a.created_at.cmp(&b.created_at),
+            }
+        });
+    })?;
+    emit_views(&app);
+    Ok(())
+}
+
 #[tauri::command]
 pub fn get_config_dir(app: AppHandle) -> Result<String, String> {
     store::config_dir(&app).map(|p| p.to_string_lossy().into_owned())

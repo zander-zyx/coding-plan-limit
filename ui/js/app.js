@@ -39,18 +39,19 @@ function renderPlans() {
   box.innerHTML = state.views.map((v) => {
     const actions = `
       <div class="row-actions">
-        <label class="switch" title="启用/停用">
+        <label class="switch sm" title="启用/停用">
           <input type="checkbox" data-toggle="${v.plan.id}" ${v.plan.enabled ? 'checked' : ''} /><i></i>
         </label>
         <button class="txt-btn" data-edit="${v.plan.id}">编辑</button>
         <button class="txt-btn" data-del="${v.plan.id}">删除</button>
       </div>`;
-    return rowHtml(v, { actions });
+    return rowHtml(v, { actions, hideHeadPct: true });
   }).join('');
   animateBars(box);
 
   // 展开行内已隐藏的详情（主窗口直接可见明细，不依赖 hover）
   box.querySelectorAll('.row-tip').forEach((el) => { el.style.display = 'block'; });
+  setupDrag(box);
 
   box.querySelectorAll('[data-toggle]').forEach((el) =>
     el.addEventListener('change', () => togglePlan(el.dataset.toggle, el.checked)));
@@ -84,6 +85,54 @@ async function removePlan(id) {
     toast(String(e));
   }
   await reload();
+}
+
+// ─── 拖拽排序（原生 HTML5 drag；顺序持久化并决定弹窗补足顺序） ──
+function setupDrag(box) {
+  let dragId = null;
+  box.querySelectorAll('.row').forEach((row) => {
+    row.setAttribute('draggable', 'true');
+    row.addEventListener('dragstart', (e) => {
+      dragId = row.querySelector('[data-toggle]')?.dataset.toggle
+        || row.querySelector('[data-edit]')?.dataset.edit;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', dragId || '');
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      box.querySelectorAll('.row').forEach((r) => r.classList.remove('drag-over'));
+    });
+    row.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (!dragId) return;
+      const overId = row.querySelector('[data-toggle]')?.dataset.toggle
+        || row.querySelector('[data-edit]')?.dataset.edit;
+      if (overId && overId !== dragId) row.classList.add('drag-over');
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+    row.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      row.classList.remove('drag-over');
+      const overId = row.querySelector('[data-toggle]')?.dataset.toggle
+        || row.querySelector('[data-edit]')?.dataset.edit;
+      if (!dragId || !overId || dragId === overId) { dragId = null; return; }
+      // 以 DOM 当前顺序为准重组
+      box.insertBefore(box.querySelector('.row.dragging'), dragId && overId ? row : null);
+      const ids = [...box.querySelectorAll('.row')]
+        .map((r) => r.querySelector('[data-toggle]')?.dataset.toggle
+          || r.querySelector('[data-edit]')?.dataset.edit)
+        .filter(Boolean);
+      dragId = null;
+      try {
+        await invoke('reorder_plans', { ids });
+      } catch (err) {
+        toast(String(err));
+      }
+      await reload();
+    });
+  });
 }
 
 // ─── 添加/编辑弹层 ────────────────────────────────────────────

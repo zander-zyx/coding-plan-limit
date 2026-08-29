@@ -11,7 +11,7 @@ const listen = Tauri.event.listen;
 // ─── 模板元数据 ────────────────────────────────────────────────
 const PROVIDER_META = {
   minimax:        { name: 'MiniMax',       color: '#ff5b4a', icon: 'icons/minimax.png', homepage: 'https://platform.minimaxi.com' },
-  zhipu:          { name: '智谱 GLM',      color: '#3f7cff', icon: 'icons/zhipu.png', homepage: 'https://open.bigmodel.cn' },
+  zhipu:          { name: '智谱 GLM',      color: '#3f7cff', icon: 'icons/zai.svg', homepage: 'https://open.bigmodel.cn' },
   'kimi-coding':  { name: 'Kimi Coding',   color: '#16c8b7', icon: 'icons/kimi.png', homepage: 'https://www.kimi.com/coding' },
   'claude-official': { name: 'Claude',     color: '#d97757', icon: 'icons/claude-official.png', homepage: 'https://claude.ai' },
   codex:          { name: 'Codex',         color: '#10a37f', icon: 'icons/codex.png', homepage: 'https://chatgpt.com' },
@@ -97,14 +97,12 @@ function fmtAgo(unixSecs) {
   return `${Math.floor(diff / 86400)} 天前`;
 }
 
-/** 紧凑重置倒计时："1.4 小时后" / "25 分后" */
-function countdownCompact(unixSecs) {
+/** 重置时刻："09-24 01:02" */
+function resetAtText(unixSecs) {
   if (!unixSecs) return '';
-  const diff = unixSecs - Date.now() / 1000;
-  if (diff <= 0) return '即将重置';
-  const h = diff / 3600;
-  if (h >= 1) return `${h.toFixed(1)} 小时后`;
-  return `${Math.max(1, Math.round(diff / 60))} 分后`;
+  const d = new Date(unixSecs * 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function fmtClock(unixSecs) {
@@ -145,7 +143,7 @@ function logoHtml(view) {
  * @param opts.main    主窗口模式：附加深色窗口明细行
  */
 /** 规范：窗口排序 5小时 → 周 → 月 → MCP/其他 */
-const WIN_ORDER = { '5小时': 0, '5 Hour': 0, '本周': 1, '周': 1, 'Weekly': 1, '本月': 2, '月': 2, '30天': 2, 'Monthly': 2, '总额度': 0 };
+const WIN_ORDER = { '5小时': 0, '5 Hour': 0, '7天': 1, '本周': 1, '周': 1, 'Weekly': 1, '本月': 2, '月': 2, '30天': 2, 'Monthly': 2, '总额度': 0 };
 function winPriority(w) {
   const key = Object.keys(WIN_ORDER).find((k) => w.label.toLowerCase() === k.toLowerCase());
   return key !== undefined ? WIN_ORDER[key] : 9;
@@ -168,12 +166,13 @@ function rowHtml(view, opts = {}) {
     if (q.kind === 'windows') {
       const wins = [...q.windows].sort((a, b) => winPriority(a) - winPriority(b));
       const worst = wins.reduce((a, w) => Math.max(a, w.used_percent), 0);
-      right = `${worst.toFixed(worst < 10 ? 1 : 0)}%`;
+      // 主窗口模式：汇总大数字多余（窗口行里已有），只在弹窗显示
+      if (!opts.hideHeadPct) right = `${worst.toFixed(worst < 10 ? 1 : 0)}%`;
       urgent = isUrgent(worst);
-      // 每个窗口一行：标签 + 进度条 + 百分比（5小时 / 周 / 月 全部可见）
+      // 每个窗口一行：标签 + 进度条 + 百分比 + 重置时刻（09-24 01:02）
       lines = wins.map((w) => {
         const u = w.used_percent;
-        const reset = w.reset_at ? countdownCompact(w.reset_at) : '';
+        const reset = w.reset_at ? resetAtText(w.reset_at) : '';
         const urgentLine = isUrgent(u) ? 'urgent' : '';
         return `
         <div class="win-line ${urgentLine}">
@@ -184,11 +183,20 @@ function rowHtml(view, opts = {}) {
         </div>`;
       }).join('');
     } else if (q.kind === 'balance') {
-      right = `${q.currency === 'CNY' ? '¥' : '$'}${q.amount.toFixed(2)}`;
-      tip = q.note || q.currency;
+      if (!opts.hideHeadPct) right = `${q.currency === 'CNY' ? '¥' : '$'}${q.amount.toFixed(2)}`;
+      // 余额明细也走 win-line 结构，与窗口行左对齐（标签列留空）
+      if (q.note) {
+        lines = `
+        <div class="win-line">
+          <span>明细</span>
+          <em style="flex:1;text-align:left">${esc(q.note)}</em>
+        </div>`;
+      } else {
+        tip = q.currency;
+      }
       if (q.amount <= view.plan.threshold) { urgent = true; rightCls = 'urgent'; }
     } else if (q.kind === 'fixed_quota') {
-      right = `${q.used_percent.toFixed(0)}%`;
+      if (!opts.hideHeadPct) right = `${q.used_percent.toFixed(0)}%`;
       urgent = isUrgent(q.used_percent);
       const u = q.used_percent;
       lines = `
@@ -207,6 +215,7 @@ function rowHtml(view, opts = {}) {
 
   return `
   <div class="row ${opts.sub ? 'row-sub' : ''} ${urgent ? 'row-urgent' : ''}" data-template="${esc(view.plan.template)}">
+    ${actions ? `<div class="row-lead">${actions}</div>` : ''}
     <div class="row-main">
       <div class="row-icon">${logo}</div>
       <div class="row-body">
@@ -216,7 +225,6 @@ function rowHtml(view, opts = {}) {
         </div>
         ${lines}
       </div>
-      ${actions}
     </div>
     ${tipLine}
   </div>`;

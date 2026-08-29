@@ -43,7 +43,7 @@ fn parse_reset(v: Option<&Value>) -> Option<i64> {
 fn window_label(secs: Option<i64>) -> String {
     match secs {
         Some(18_000) => "5小时".into(),
-        Some(604_800) => "本周".into(),
+        Some(604_800) => "7天".into(),
         Some(2_592_000) => "30天".into(),
         Some(s) if s >= 86_400 => format!("{}天", s / 86_400),
         Some(s) if s >= 3_600 => format!("{}小时", s / 3_600),

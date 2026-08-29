@@ -153,6 +153,8 @@ html[data-theme='light'] .panel { background: rgba(250, 248, 245, 0.86); }
 }
 .row:hover { background: var(--brand-aura); transform: translateY(-0.5px); }
 .row:last-child { border-bottom: none; }
+.row.dragging { opacity: 0.4; cursor: grabbing; }
+.row.drag-over { box-shadow: inset 0 2px 0 var(--brand); }
 .row-main { display: flex; align-items: center; gap: 10px; }
 
 .row-icon {
@@ -317,12 +319,19 @@ html[data-theme='dark'] .side { background: rgba(255, 255, 255, 0.02); }
 
 /* 套餐行（主窗口）：与弹窗同构 + 行内控制区 */
 .row .row-actions {
-  display: flex; align-items: center; gap: 4px;
+  display: flex; align-items: center; gap: 2px;
   opacity: 0;
   transition: opacity var(--tr);
   flex: none;
 }
-.row:hover .row-actions, .row:focus-within .row-actions { opacity: 1; }
+.row-lead { flex: none; margin-right: 4px; }
+.row-lead .row-actions { opacity: 0.85; }
+.row:hover .row-lead .row-actions, .row:hover .row-actions, .row:focus-within .row-actions { opacity: 1; }
+
+/* 小号开关（行内控制用） */
+.switch.sm { width: 26px; height: 16px; }
+.switch.sm i::after { width: 12px; height: 12px; top: 2px; left: 2px; }
+.switch.sm input:checked + i::after { transform: translateX(10px); }
 
 /* 进度条（通用）：track + 品牌填充 + 内辉光，500ms 填充动画 */
 .bar {

@@ -38,7 +38,7 @@ pub async fn query() -> Result<Quota, String> {
         }
     };
     push("5小时", "fiveHour", "fiveHourResetAt");
-    push("本周", "sevenDay", "sevenDayResetAt");
+    push("7天", "sevenDay", "sevenDayResetAt");
 
     if windows.is_empty() {
         return Err("缓存中无 rate_limits 数据".into());

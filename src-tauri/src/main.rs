@@ -50,6 +50,7 @@ fn main() {
             commands::reset_custom_icon,
             commands::get_config_dir,
             commands::open_external,
+            commands::reorder_plans,
             update::check_update,
             update::get_update_info,
         ])
