@@ -232,10 +232,9 @@ function splitPopupViews(views, popupPlanIds, max) {
   const ids = popupPlanIds || [];
   const cap = ids.length ? Math.min(Math.max(ids.length, 1), 10) : Math.min(Math.max(max || 3, 1), 3);
   const enabled = views.filter((v) => v.plan.enabled);
-  const byId = new Map(enabled.map((v) => [v.plan.id, v]));
-  const picked = ids
-    .map((id) => byId.get(id))
-    .filter(Boolean)
+  // 展示顺序跟随套餐列表顺序（与主窗口拖拽排序一致），而非勾选顺序
+  const picked = enabled
+    .filter((v) => ids.includes(v.plan.id))
     .slice(0, cap);
   for (const v of enabled) {
     if (picked.length >= cap) break;
