@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Plan Limit Logo 草案 — Z / ZYX</title>
+<style>
+  :root { color-scheme: dark; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0F0F13; color: #E8E6F0;
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    padding: 48px 56px;
+  }
+  h1 { font-size: 15px; font-weight: 600; color: #9A93B8; letter-spacing: 2px; margin-bottom: 6px; }
+  .sub { font-size: 12px; color: #5E596F; margin-bottom: 40px; }
+  .row {
+    display: flex; align-items: center; gap: 36px;
+    background: #16151C; border: 1px solid #26232F; border-radius: 20px;
+    padding: 32px 36px; margin-bottom: 24px;
+  }
+  .info { width: 230px; flex-shrink: 0; }
+  .info .name { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  .info .desc { font-size: 12.5px; line-height: 1.7; color: #8B85A3; }
+  .main128 { width: 128px; height: 128px; flex-shrink: 0; }
+  .ladder { display: flex; align-items: flex-end; gap: 22px; }
+  .step { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .step svg { display: block; }
+  .step .cap { font-size: 10.5px; color: #55506A; }
+  .onlight {
+    width: 88px; height: 88px; background: #F5F4F9; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .onlight svg { width: 52px; height: 52px; }
+  .spacer { flex: 1; }
+</style>
+</head>
+<body>
+
+<h1>PLAN LIMIT · LOGO 草案</h1>
+<div class="sub">张亦修 ZYX · 手绘几何路径 · 右侧阶梯为托盘实际尺寸表现（128 / 48 / 24 / 16 px）· 最右为浅色底表现</div>
+
+<!-- ══════════ 方案 A ══════════ -->
+<div class="row">
+  <div class="info">
+    <div class="name">A · Z 额度斜线</div>
+    <div class="desc">单字母 Z（张姓），中间斜线切成三段"额度条"，尾段用默认主题紫。16px 托盘下依然是完整 Z。</div>
+  </div>
+  <svg class="main128" viewBox="0 0 512 512">
+    <defs>
+      <linearGradient id="aBg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#232130"/><stop offset="1" stop-color="#141219"/>
+      </linearGradient>
+    </defs>
+    <rect width="512" height="512" rx="116" fill="url(#aBg)"/>
+    <rect x="10" y="10" width="492" height="492" rx="108" fill="none" stroke="#FFFFFF" stroke-opacity="0.07" stroke-width="2"/>
+    <rect x="118" y="116" width="276" height="66" fill="#F4F3F8"/>
+    <rect x="118" y="330" width="276" height="66" fill="#F4F3F8"/>
+    <polygon points="328,182 394,182 334,224 268,224" fill="#F4F3F8"/>
+    <polygon points="251,236 317,236 260,276 194,276" fill="#F4F3F8"/>
+    <polygon points="178,288 244,288 184,330 118,330" fill="#8B6CFF"/>
+  </svg>
+  <div class="ladder" id="ladderA"></div>
+  <div class="spacer"></div>
+  <div class="onlight"><svg viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="116" fill="#17151E"/>
+    <rect x="118" y="116" width="276" height="66" fill="#F4F3F8"/>
+    <rect x="118" y="330" width="276" height="66" fill="#F4F3F8"/>
+    <polygon points="328,182 394,182 334,224 268,224" fill="#F4F3F8"/>
+    <polygon points="251,236 317,236 260,276 194,276" fill="#F4F3F8"/>
+    <polygon points="178,288 244,288 184,330 118,330" fill="#8B6CFF"/>
+  </svg></div>
+</div>
+
+<!-- ══════════ 方案 B ══════════ -->
+<div class="row">
+  <div class="info">
+    <div class="name">B · ZYX 星芒联字</div>
+    <div class="desc">三字母共构：上下横线是 Z 的骨架，交叉双斜是 X，中心竖柄是 Y，共用一个星形节点。紫渐变圆底，气质更软。</div>
+  </div>
+  <svg class="main128" viewBox="0 0 512 512">
+    <defs>
+      <linearGradient id="bBg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#7C5CFF"/><stop offset="1" stop-color="#5636E8"/>
+      </linearGradient>
+    </defs>
+    <circle cx="256" cy="256" r="248" fill="url(#bBg)"/>
+    <g stroke="#FFFFFF" stroke-width="42" stroke-linecap="round" fill="none">
+      <line x1="170" y1="170" x2="342" y2="342"/>
+      <line x1="342" y1="170" x2="170" y2="342"/>
+      <line x1="170" y1="170" x2="342" y2="170"/>
+      <line x1="170" y1="342" x2="342" y2="342"/>
+      <line x1="256" y1="256" x2="256" y2="200"/>
+    </g>
+    <circle cx="256" cy="256" r="27" fill="#FFFFFF"/>
+  </svg>
+  <div class="ladder" id="ladderB"></div>
+  <div class="spacer"></div>
+  <div class="onlight"><svg viewBox="0 0 512 512">
+    <circle cx="256" cy="256" r="248" fill="#6A4BFA"/>
+    <g stroke="#FFFFFF" stroke-width="42" stroke-linecap="round" fill="none">
+      <line x1="170" y1="170" x2="342" y2="342"/>
+      <line x1="342" y1="170" x2="170" y2="342"/>
+      <line x1="170" y1="170" x2="342" y2="170"/>
+      <line x1="170" y1="342" x2="342" y2="342"/>
+      <line x1="256" y1="256" x2="256" y2="200"/>
+    </g>
+    <circle cx="256" cy="256" r="27" fill="#FFFFFF"/>
+  </svg></div>
+</div>
+
+<!-- ══════════ 方案 C ══════════ -->
+<div class="row">
+  <div class="info">
+    <div class="name">C · Z 进度环</div>
+    <div class="desc">Z 外包 270° 进度弧 + 紫色端点，"额度监控"语义最直白，与弹窗里的环形用量条同构。</div>
+  </div>
+  <svg class="main128" viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="116" fill="#17151E"/>
+    <rect x="10" y="10" width="492" height="492" rx="108" fill="none" stroke="#FFFFFF" stroke-opacity="0.07" stroke-width="2"/>
+    <circle cx="256" cy="256" r="186" fill="none" stroke="#FFFFFF" stroke-opacity="0.13" stroke-width="34"/>
+    <path d="M 256 70 A 186 186 0 1 1 70 256" fill="none" stroke="#F4F3F8" stroke-width="34" stroke-linecap="round"/>
+    <circle cx="70" cy="256" r="29" fill="#8B6CFF"/>
+    <g transform="translate(256,256) scale(0.55) translate(-256,-256)">
+      <polygon points="118,116 394,116 394,182 184,330 394,330 394,396 118,396 118,330 328,182 118,182" fill="#F4F3F8"/>
+    </g>
+  </svg>
+  <div class="ladder" id="ladderC"></div>
+  <div class="spacer"></div>
+  <div class="onlight"><svg viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="116" fill="#17151E"/>
+    <circle cx="256" cy="256" r="186" fill="none" stroke="#FFFFFF" stroke-opacity="0.13" stroke-width="34"/>
+    <path d="M 256 70 A 186 186 0 1 1 70 256" fill="none" stroke="#F4F3F8" stroke-width="34" stroke-linecap="round"/>
+    <circle cx="70" cy="256" r="29" fill="#8B6CFF"/>
+    <g transform="translate(256,256) scale(0.55) translate(-256,-256)">
+      <polygon points="118,116 394,116 394,182 184,330 394,330 394,396 118,396 118,330 328,182 118,182" fill="#F4F3F8"/>
+    </g>
+  </svg></div>
+</div>
+
+<script>
+  // 把每个方案的 SVG 克隆到阶梯尺寸（模拟托盘实际观感）
+  const defs = {
+    ladderA: document.querySelector('.row:nth-of-type(1) .main128'),
+    ladderB: document.querySelector('.row:nth-of-type(2) .main128'),
+    ladderC: document.querySelector('.row:nth-of-type(3) .main128'),
+  };
+  for (const [id, src] of Object.entries(defs)) {
+    const host = document.getElementById(id);
+    for (const size of [48, 24, 16]) {
+      const step = document.createElement('div');
+      step.className = 'step';
+      const svg = src.cloneNode(true);
+      svg.removeAttribute('class');
+      svg.style.width = size + 'px';
+      svg.style.height = size + 'px';
+      // 阶梯里的直接克隆会带重复 id 的渐变引用，换成纯色避免跨 svg 引用失效
+      svg.querySelectorAll('linearGradient').forEach(g => g.remove());
+      const flat = { aBg: '#1B1923', bBg: '#6A4BFA' }[id.replace('ladder','').toLowerCase() + 'Bg'];
+      svg.querySelectorAll('[fill="url(#aBg)"],[fill="url(#bBg)"]').forEach(el => el.setAttribute('fill', flat));
+      step.appendChild(svg);
+      const cap = document.createElement('div');
+      cap.className = 'cap'; cap.textContent = size + 'px';
+      step.appendChild(cap);
+      host.appendChild(step);
+    }
+  }
+</script>
+</body>
+</html>

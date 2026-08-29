@@ -592,10 +592,8 @@ $('btn-check-update').addEventListener('click', async () => {
       showUpdateSide(info);
       invoke('open_external', { url: info.url }).catch(() => {});
     } else {
-      // 已是最新：按钮短暂显示当前版本（规范禁止成功 toast，用按钮文案反馈）
-      btn.textContent = `已是最新 v${info.current}`;
-      setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 2500);
-      return;
+      // 已是最新：toast 明确反馈当前版本
+      toast(`已是最新版本 v${info.current}`);
     }
   } catch (e) {
     toast(String(e));
