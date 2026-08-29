@@ -211,6 +211,7 @@ function rowHtml(view, opts = {}) {
 
   const tipLine = tip ? `<div class="row-tip">${esc(tip)}</div>` : '';
   const lead = opts.lead || '';
+  const actions = opts.actions || '';
   const logo = logoHtml(view);
 
   return `
