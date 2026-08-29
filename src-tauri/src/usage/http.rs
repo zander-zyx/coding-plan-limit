@@ -59,3 +59,31 @@ pub fn str_of<'a>(v: &'a serde_json::Value, key: &str) -> Option<&'a str> {
 pub fn ms_to_secs(v: Option<f64>) -> Option<i64> {
     v.map(|ms| (ms / 1000.0) as i64).filter(|s| *s > 0)
 }
+
+/// 宽松时间解析：unix 秒 / 毫秒 / 数字字符串 / ISO8601 字符串 → 秒。
+/// Kimi 的 resetTime 是 ISO 字符串，火山等返回秒或毫秒数字，统一在此收敛。
+pub fn parse_time_any(v: Option<&serde_json::Value>) -> Option<i64> {
+    let v = v?;
+    let secs = |n: i64| {
+        if n <= 0 {
+            None
+        } else if n < 1_000_000_000_000 {
+            Some(n) // 秒
+        } else {
+            Some(n / 1000) // 毫秒
+        }
+    };
+    if let Some(n) = v.as_i64() {
+        return secs(n);
+    }
+    if let Some(n) = v.as_f64() {
+        return secs(n as i64);
+    }
+    let s = v.as_str()?;
+    if let Ok(ts) = s.trim().parse::<i64>() {
+        return secs(ts);
+    }
+    time::OffsetDateTime::parse(s, &time::format_description::well_known::Rfc3339)
+        .ok()
+        .map(|dt| dt.unix_timestamp())
+}

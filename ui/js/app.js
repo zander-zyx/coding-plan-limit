@@ -598,7 +598,13 @@ $('btn-check-update').addEventListener('click', async () => {
       toast(`检查更新失败：${info.error}`);
     } else if (info.has_update) {
       showUpdateSide(info);
-      invoke('open_external', { url: info.url }).catch(() => {});
+      toast(`发现新版本 v${info.latest}，点击侧边按钮直接更新`);
+      if (info.asset_url) {
+        updateUrl = info.url;
+        updateAsset = info.asset_url;
+        $('btn-update-side').hidden = false;
+        startSideDownload();
+      }
     } else {
       // 已是最新：toast 明确反馈当前版本
       toast(`已是最新版本 v${info.current}`);

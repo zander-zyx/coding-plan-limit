@@ -55,6 +55,7 @@ fn main() {
             commands::reorder_plans,
             update::check_update,
             update::get_update_info,
+            update::download_and_install,
         ])
         .setup(|app| {
             // 冷启动先载入上次快照，避免弹窗/主界面短暂空白

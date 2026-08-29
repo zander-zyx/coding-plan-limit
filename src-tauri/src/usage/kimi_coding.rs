@@ -1,7 +1,7 @@
 //! Kimi For Coding 用量：5小时窗口 + 周限额
 //! 与 claude-mini-hud usage.ts 一致：limits 中最后一个带 detail 的项生效（覆写语义）。
 
-use super::http::{f64_of, get_json, ms_to_secs};
+use super::http::{f64_of, get_json};
 use super::types::{Quota, WindowQuota};
 
 pub async fn query(bearer: &str) -> Result<Quota, String> {
@@ -20,7 +20,7 @@ pub async fn query(bearer: &str) -> Result<Quota, String> {
             windows.push(WindowQuota {
                 label: "5小时".into(),
                 used_percent: pct.clamp(0.0, 100.0),
-                reset_at: ms_to_secs(f64_of(detail, "resetTime")),
+                reset_at: crate::usage::http::parse_time_any(detail.get("resetTime")),
             });
         }
     }
@@ -34,7 +34,7 @@ pub async fn query(bearer: &str) -> Result<Quota, String> {
         windows.push(WindowQuota {
             label: "7天".into(),
             used_percent: pct.clamp(0.0, 100.0),
-            reset_at: ms_to_secs(f64_of(usage, "resetTime")),
+            reset_at: crate::usage::http::parse_time_any(usage.get("resetTime")),
         });
     }
 

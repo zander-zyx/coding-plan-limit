@@ -123,16 +123,47 @@ document.getElementById('btn-settings').addEventListener('click', () => invoke('
 
 // ─── 更新按钮（仅在有新版本时出现在头部） ─────────────────────
 let updateUrl = null;
+let updateAsset = null;
+let downloading = false;
 const updateBtn = document.getElementById('btn-update');
+const ICON_SVG = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 19h16"/></svg>';
+
 function showUpdateBtn(info) {
   if (info && info.has_update && info.url) {
     updateUrl = info.url;
+    updateAsset = info.asset_url || null;
     updateBtn.hidden = false;
+    updateBtn.innerHTML = ICON_SVG;
+    updateBtn.disabled = false;
   }
 }
-updateBtn.addEventListener('click', () => {
-  if (updateUrl) invoke('open_external', { url: updateUrl }).catch(() => {});
+
+async function startDownload() {
+  if (downloading || !updateAsset) return;
+  downloading = true;
+  updateBtn.disabled = true;
+  updateBtn.textContent = '0%';
+  try {
+    // Windows：下载完成后后端自动启动安装器并退出应用
+    await invoke('download_and_install', { url: updateAsset });
+  } catch (e) {
+    toast(String(e));
+    showUpdateBtn({ has_update: true, url: updateUrl, asset_url: updateAsset });
+  } finally {
+    downloading = false;
+  }
+}
+
+listen('update-download-progress', (e) => {
+  updateBtn.textContent = `${e.payload}%`;
 });
+
+updateBtn.addEventListener('click', () => {
+  if (downloading) return;
+  if (updateAsset) startDownload();
+  else if (updateUrl) invoke('open_external', { url: updateUrl }).catch(() => {});
+});
+
 invoke('get_update_info').then(showUpdateBtn).catch(() => {});
 listen('update-available', (e) => showUpdateBtn(e.payload));
 
