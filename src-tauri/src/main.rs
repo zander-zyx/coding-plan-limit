@@ -80,9 +80,12 @@ fn main() {
                     app.handle(),
                     &format!("startup: process_aumid hr={}", commands::process_aumid_hr()),
                 );
+                let style = store::load_settings(app.handle()).logo_style;
                 if let Some(img) = commands::resolve_saved_logo(app.handle()) {
                     commands::apply_window_icon(app.handle(), &img);
                 }
+                // macOS：Dock 图标跟随三态（其他平台空操作）
+                commands::apply_dock_icon_for(app.handle(), &style);
             }
 
             // Windows：弹窗 Mica/Acrylic 效果层设置 DWM 圆角

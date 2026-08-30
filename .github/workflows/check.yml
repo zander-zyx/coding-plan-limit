@@ -1,0 +1,35 @@
+name: Check
+
+# push/PR 即编译三平台：平台特化代码（Windows AUMID、macOS Dock 等 cfg 分支）
+# 无需发版即可验证编译，防止单侧破坏
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+          - os: macos-latest
+          - os: ubuntu-22.04
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev patchelf libsecret-1-0 libsecret-1-dev
+
+      - name: cargo check
+        working-directory: src-tauri
+        run: cargo check

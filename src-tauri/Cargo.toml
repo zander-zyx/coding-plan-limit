@@ -28,6 +28,16 @@ time = { version = "0.3", features = ["formatting", "parsing"] }
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.60", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_Graphics_Dwm", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi", "Win32_UI_Shell_PropertiesSystem", "Win32_System_Com_StructuredStorage", "Win32_System_Variant"] }
 
+# macOS Dock 图标跟随 Logo（特性集对齐 tauri 自身，版本统一不产生重复编译单元）
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+    "std", "NSApplication", "NSResponder", "NSImage",
+] }
+objc2-foundation = { version = "0.3", default-features = false, features = [
+    "std", "NSData",
+] }
+
 [profile.release]
 strip = true
 lto = true

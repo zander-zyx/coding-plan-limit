@@ -284,13 +284,22 @@ pub fn get_config_dir(app: AppHandle) -> Result<String, String> {
 /// 内置 Logo Mark（用户设计的 Z 标，256px 深色圆角底）
 pub static LOGO_MARK: &[u8] = include_bytes!("../../ui/icons/app-mark.png");
 
-/// PNG dataURL → 解码为图像
-fn decode_data_url_png(data_url: &str) -> Option<tauri::image::Image<'static>> {
+/// 默认原色图标 PNG 字节（macOS Dock 图标用：NSImage 吃编码图字节，非 RGBA 裸像素）
+#[cfg(target_os = "macos")]
+pub static DEFAULT_ICON_PNG: &[u8] = include_bytes!("../icons/128x128.png");
+
+/// PNG dataURL → 原始 PNG 字节（macOS Dock 图标直接复用编码字节，免去重编码）
+fn decode_data_url_png_bytes(data_url: &str) -> Option<Vec<u8>> {
     data_url
         .strip_prefix("data:image/png;base64,")
         .and_then(|payload| {
             base64::Engine::decode(&base64::engine::general_purpose::STANDARD, payload).ok()
         })
+}
+
+/// PNG dataURL → 解码为图像
+fn decode_data_url_png(data_url: &str) -> Option<tauri::image::Image<'static>> {
+    decode_data_url_png_bytes(data_url)
         .and_then(|raw| tauri::image::Image::from_bytes(&raw[..]).ok())
 }
 
@@ -628,6 +637,46 @@ pub fn apply_window_icon(app: &AppHandle, img: &tauri::image::Image<'_>) {
     }
 }
 
+/// macOS：Dock 图标跟随 Logo。tauri 2 无运行时 Dock 图标 API（仅 dev 模式设嵌入图），
+/// 直调 NSApplication.setApplicationIconImage，须主线程（tauri 内部同款范式）。
+/// NSImage 吃 PNG 编码字节，无需 PNG 编码器。
+#[cfg(target_os = "macos")]
+fn apply_dock_icon(app: &AppHandle, png: Vec<u8>) {
+    let _ = app.run_on_main_thread(move || unsafe {
+        use objc2::{AllocAnyThread, MainThreadMarker};
+        use objc2_app_kit::{NSApplication, NSImage};
+        use objc2_foundation::NSData;
+        let Some(mtm) = MainThreadMarker::new() else { return };
+        let nsapp = NSApplication::sharedApplication(mtm);
+        let data = NSData::with_bytes(&png);
+        let Some(icon) = NSImage::initWithData(NSImage::alloc(), &data) else { return };
+        nsapp.setApplicationIconImage(Some(&icon));
+    });
+}
+
+/// 按样式同步 macOS Dock 图标（其他平台空操作）。
+/// color=默认原色 / mark=Z 标 / custom=custom_icon 存档，三者均有现成 PNG 字节。
+pub fn apply_dock_icon_for(app: &AppHandle, style: &str) {
+    #[cfg(target_os = "macos")]
+    {
+        let png = match style {
+            "custom" => store::load_settings(app)
+                .custom_icon
+                .as_deref()
+                .and_then(decode_data_url_png_bytes),
+            "mark" => Some(LOGO_MARK.to_vec()),
+            _ => Some(DEFAULT_ICON_PNG.to_vec()),
+        };
+        if let Some(png) = png {
+            apply_dock_icon(app, png);
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (app, style);
+    }
+}
+
 /// 前端把用户选择的图片画成 PNG dataURL 后提交；Rust 解码并实时更换托盘图标
 #[tauri::command]
 pub fn set_custom_icon(app: AppHandle, data_url: String) -> Result<(), String> {
@@ -645,6 +694,9 @@ pub fn set_custom_icon(app: AppHandle, data_url: String) -> Result<(), String> {
     apply_tray_icon(&app, img.clone());
     // 同步主窗口标题栏/任务栏图标（任务栏 pinned 图标仍以 exe 内置图标为准，运行时无法替换）
     apply_window_icon(&app, &img);
+    // macOS Dock 跟随（custom 存档此刻尚未落盘，直接用手上字节）
+    #[cfg(target_os = "macos")]
+    apply_dock_icon(&app, raw);
 
     store::update_config(&app, |config| {
         config.settings.custom_icon = Some(data_url);
@@ -694,8 +746,10 @@ pub fn set_logo_style(app: AppHandle, style: String) -> Result<(), String> {
     }
     // 自定义图片保留不清空：切换内置样式后仍可一键切回自定义
     store::update_config(&app, |config| {
-        config.settings.logo_style = style;
+        config.settings.logo_style = style.clone();
     })?;
+    // macOS Dock 跟随三态（custom 读存档，此处必已落盘）
+    apply_dock_icon_for(&app, &style);
     Ok(())
 }
 
@@ -707,6 +761,8 @@ pub fn reset_custom_icon(app: AppHandle) -> Result<(), String> {
         apply_tray_icon(&app, default_icon.clone());
         apply_window_icon(&app, &default_icon);
     }
+    // macOS Dock 恢复默认原色
+    apply_dock_icon_for(&app, "color");
     store::update_config(&app, |config| {
         config.settings.custom_icon = None;
         config.settings.logo_style = "color".into();
