@@ -11,7 +11,7 @@
 
 | 托盘悬浮面板（Windows 悬停即弹） | 主窗口（套餐管理） |
 |---|---|
-| ![托盘悬浮面板](docs/screenshot-popup.png) | ![主窗口](docs/screenshot-main.png) |
+| ![托盘悬浮面板](docs/screenshot-popup-v2.png) | ![主窗口](docs/screenshot-main.png) |
 
 额度用尽的窗口自动进入**模糊遮罩 + 重置倒计时**（如 `1d8h11m`），鼠标悬停即揭开查看详情。
 
