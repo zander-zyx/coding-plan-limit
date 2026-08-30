@@ -9,3 +9,4 @@ dist/
 !ui/icons/*.png
 !src-tauri/icons/**
 !assets/**
+!docs/**
