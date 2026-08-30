@@ -58,3 +58,6 @@ jobs:
           releaseBody: '跨平台安装包：Windows (.exe) / macOS (.dmg) / Linux (.AppImage, .deb)'
           releaseDraft: false
           prerelease: false
+          # 必须显式传 target：macOS Intel job 跑在 arm64 runner 上，
+          # 不传则按宿主机构建出 aarch64 产物（v0.3.19 前 Intel dmg 一直缺失的根因）
+          args: --target ${{ join(matrix.targets, ' ') }}
