@@ -87,3 +87,23 @@ pub fn parse_time_any(v: Option<&serde_json::Value>) -> Option<i64> {
         .ok()
         .map(|dt| dt.unix_timestamp())
 }
+
+/// POST 二进制并返回 (HTTP 状态码, 响应字节)。
+/// grok.com 计费端点是 gRPC-web protobuf，不走 JSON；状态码由调用方区分凭据失效。
+pub async fn post_bytes(
+    url: &str,
+    headers: &[(&str, String)],
+    body: Vec<u8>,
+) -> Result<(u16, Vec<u8>), String> {
+    let mut req = client().post(url).body(body);
+    for (k, v) in headers {
+        req = req.header(*k, v);
+    }
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| format!("网络请求失败: {e}"))?;
+    let status = resp.status().as_u16();
+    let bytes = resp.bytes().await.map_err(|e| format!("读取响应失败: {e}"))?;
+    Ok((status, bytes.to_vec()))
+}

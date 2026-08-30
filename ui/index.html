@@ -64,6 +64,26 @@
               <button id="accent-reset" class="txt-btn">默认</button>
             </div>
           </div>
+          <div class="set-row" id="row-accent-sat">
+            <div class="label">饱和度</div>
+            <div class="threshold-row">
+              <input type="range" id="accent-sat" min="0" max="100" step="1" />
+              <div class="input-unit">
+                <input type="number" id="accent-sat-num" min="0" max="100" step="1" />
+                <span class="unit">%</span>
+              </div>
+            </div>
+          </div>
+          <div class="set-row" id="row-accent-light">
+            <div class="label">对比度</div>
+            <div class="threshold-row">
+              <input type="range" id="accent-light" min="0" max="100" step="1" />
+              <div class="input-unit">
+                <input type="number" id="accent-light-num" min="0" max="100" step="1" />
+                <span class="unit">%</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="sec">
@@ -72,12 +92,19 @@
             <div class="label">固定展示</div>
             <div class="popup-pick" id="popup-pick"></div>
           </div>
+          <div class="set-row">
+            <div class="label">重开冷却<span class="info-i" data-tip="冷却时间内重开弹窗保留原画面，不重播动画；0 为关闭冷却"><svg viewBox="0 0 16 16" width="13" height="13" fill="none"><circle cx="8" cy="8" r="6.4" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="5.1" r="0.9" fill="currentColor"/><path d="M8 7.2v3.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span></div>
+            <div class="setting-ctl">
+              <input type="number" id="in-popup-cooldown" min="0" max="120" step="1" />
+              <span style="font-size:12px;color:var(--text-t)">秒</span>
+            </div>
+          </div>
         </div>
 
         <div class="sec">
           <div class="sec-title">刷新与通知</div>
           <div class="set-row">
-            <div class="label">自动刷新间隔</div>
+            <div class="label">自动刷新间隔<span class="info-i" data-tip="后台每隔该秒数自动刷新一次数据，最短 10 秒"><svg viewBox="0 0 16 16" width="13" height="13" fill="none"><circle cx="8" cy="8" r="6.4" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="5.1" r="0.9" fill="currentColor"/><path d="M8 7.2v3.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span></div>
             <div class="setting-ctl">
               <input type="number" id="in-refresh" min="10" max="86400" step="5" />
               <span style="font-size:12px;color:var(--text-t)">秒</span>
@@ -134,7 +161,7 @@
                   <span id="custom-logo-plus" class="logo-plus" aria-hidden="true">+</span>
                 </button>
               </div>
-              <button id="btn-icon-pick" class="btn ghost" hidden>选择图片</button>
+              <button id="btn-icon-pick" class="btn ghost">选择图片</button>
             </div>
           </div>
         </div>
@@ -219,7 +246,7 @@
         <div class="form-item" id="f-ak-item" hidden>
           <label>AccessKey ID</label>
           <input type="password" id="f-ak-id" placeholder="" />
-          <div class="hint">阿里云主账号 RAM 密钥（非 DashScope API Key）</div>
+          <div class="hint" id="ak-hint">阿里云主账号 RAM 密钥（非 DashScope API Key）</div>
         </div>
         <div class="form-item" id="f-ak-secret-item" hidden>
           <label>AccessKey Secret</label>
@@ -232,8 +259,36 @@
         </div>
         <div class="form-item">
           <label id="f-threshold-label">提醒阈值</label>
-          <input type="number" id="f-threshold" min="0" max="100" step="1" />
+          <div class="threshold-row">
+            <input type="range" id="f-threshold-range" min="0" max="100" step="1" />
+            <div class="input-unit">
+              <input type="number" id="f-threshold" min="0" max="100" step="1" />
+              <span class="unit" id="f-threshold-unit">%</span>
+            </div>
+          </div>
           <div class="hint" id="f-threshold-hint"></div>
+        </div>
+        <div class="form-item" id="f-codex-item" hidden>
+          <label>Codex 账号</label>
+          <div class="codex-acct">
+            <div class="codex-acct-row">
+              <select id="f-codex-account"></select>
+              <button class="btn ghost" id="btn-codex-bind" type="button">绑定</button>
+            </div>
+            <div class="codex-acct-row">
+              <button class="btn ghost sm" id="btn-codex-capture" type="button">捕获当前登录</button>
+              <button class="btn ghost sm" id="btn-codex-login" type="button">登录新账号</button>
+              <button class="txt-btn" id="btn-codex-follow" type="button">恢复跟随本机</button>
+            </div>
+            <div class="hint" id="f-codex-hint">默认跟随本机 Codex CLI 当前登录的账号。</div>
+            <div class="codex-login" id="codex-login-box" hidden>
+              <code id="codex-user-code"></code>
+              <button class="txt-btn" id="btn-codex-copy" type="button">复制</button>
+              <span class="codex-sep"></span>
+              <button class="btn sm" id="btn-codex-open" type="button">打开授权页面</button>
+              <span class="codex-status" id="codex-login-status">等待授权…</span>
+            </div>
+          </div>
         </div>
         <div class="form-item">
           <label class="check-row">
@@ -247,6 +302,19 @@
         <span class="spacer"></span>
         <button class="btn ghost" id="btn-cancel">取消</button>
         <button class="btn" id="btn-save" disabled>保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 删除确认弹层（叠加在套餐弹层之上） -->
+  <div class="modal-mask" id="confirm-modal">
+    <div class="modal confirm">
+      <h2>删除套餐</h2>
+      <p class="confirm-text">将删除「<span id="confirm-name"></span>」及其已保存的凭据，此操作不可撤销。</p>
+      <div class="form-actions">
+        <span class="spacer"></span>
+        <button class="btn ghost" id="btn-confirm-cancel">取消</button>
+        <button class="btn danger armed" id="btn-confirm-ok">删除</button>
       </div>
     </div>
   </div>

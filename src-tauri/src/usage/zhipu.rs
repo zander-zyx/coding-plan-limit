@@ -80,7 +80,11 @@ pub async fn query(region: &str, base_url: Option<&str>, bearer: &str) -> Result
 
         if typ.eq_ignore_ascii_case("TIME_LIMIT") {
             if let Some(p) = pct {
-                mcp = Some(WindowQuota { label: "MCP".into(), used_percent: p.clamp(0.0, 100.0), reset_at: None });
+                mcp = Some(WindowQuota {
+                    label: "MCP".into(),
+                    used_percent: p.clamp(0.0, 100.0),
+                    reset_at: reset,
+                });
             }
             continue;
         }

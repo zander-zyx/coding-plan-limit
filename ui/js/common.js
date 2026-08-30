@@ -13,12 +13,16 @@ const PROVIDER_META = {
   minimax:        { name: 'MiniMax',       color: '#ff5b4a', icon: 'icons/minimax-color.svg', homepage: 'https://platform.minimaxi.com/console/usage' },
   zhipu:          { name: '智谱 GLM',      color: '#3f7cff', icon: 'icons/m-zai.svg', homepage: 'https://bigmodel.cn/coding-plan/personal/usage' },
   'kimi-coding':  { name: 'Kimi Coding',   color: '#16c8b7', icon: 'icons/kimi-color.png', homepage: 'https://www.kimi.com/code/console' },
+  volcengine:     { name: '火山方舟',      color: '#006EFF', icon: 'icons/volcengine-color.png', homepage: 'https://console.volcengine.com/ark/region:ark+cn-beijing/openManagement?advancedActiveKey=subscribe' },
   'claude-official': { name: 'Claude',     color: '#d97757', icon: 'icons/claude-color.svg', homepage: 'https://claude.ai' },
-  codex:          { name: 'Codex',         color: '#10a37f', icon: 'icons/m-openai.svg', homepage: 'https://chatgpt.com' },
+  codex:          { name: 'OpenAI',        color: '#10a37f', icon: 'icons/m-openai.svg', homepage: 'https://chatgpt.com' },
+  grok:           { name: 'Grok',          color: '#000000', icon: 'icons/m-grok.svg', homepage: 'https://x.ai/grok' },
   deepseek:       { name: 'DeepSeek',      color: '#4d6bfe', icon: 'icons/deepseek-color.svg', homepage: 'https://platform.deepseek.com' },
   kimi:           { name: 'Kimi',          color: '#0ea5a3', icon: 'icons/kimi-color.png', homepage: 'https://platform.moonshot.cn' },
   stepfun:        { name: '阶跃星辰',      color: '#8b5cf6', icon: 'icons/stepfun-color.svg', homepage: 'https://platform.stepfun.com/plan-subscribe' },
   siliconflow:    { name: '硅基流动',      color: '#6366f1', icon: 'icons/siliconcloud-color.svg', homepage: 'https://cloud.siliconflow.cn' },
+  openrouter:     { name: 'OpenRouter',    color: '#C8FF00', icon: 'icons/openrouter-color.svg', homepage: 'https://openrouter.ai/credits' },
+  novita:         { name: 'Novita AI',     color: '#23D57C', icon: 'icons/novita-color.svg', homepage: 'https://novita.ai' },
   newapi:         { name: 'NewAPI',        color: '#38bdf8', icon: 'icons/newapi.png', homepage: '' },
   sub2api:        { name: 'Sub2API',       color: '#94a3b8', icon: 'icons/sub2api.svg', homepage: '' },
 };
@@ -37,27 +41,30 @@ _systemDark.addEventListener('change', () => {
   }
 });
 
-/** Kimi 规范：Hue 落在 260–280° 时吸附到官方 Kimi 紫 #7c5cff（hue≈252） */
-function hexToHue(hex) {
+/** 用户选色 → 提取 H/S/L 写入派生变量，全站配色自动跟随；animate 时经 Motion 平滑过渡 */
+function hexToHslFull(hex) {
   const n = parseInt(hex.slice(1), 16);
-  const r = ((n >> 16) & 0xff) / 255, g = ((n >> 8) & 0xff) / 255, b = (n & 0xff) / 255;
+  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  if (max === min) return 257;
+  const l = (max + min) / 2;
   const d = max - min;
+  if (d === 0) return { h: 257, s: 0, l: Math.round(l * 100) }; // 无色相（黑/白/灰）
+  const s = d / (1 - Math.abs(2 * l - 1));
   let h;
   if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
   else if (max === g) h = ((b - r) / d + 2) / 6;
   else h = ((r - g) / d + 4) / 6;
-  const deg = Math.round(h * 360);
-  return deg >= 260 && deg <= 280 ? 257 : deg;
+  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
 }
 
-/** 用户选色 → 提取 Hue 写入 --brand-hue，全站配色自动派生；animate 时经 Motion 平滑过渡 */
 function applyAccent(hex, animate) {
   const ok = hex && /^#[0-9a-fA-F]{6}$/.test(hex);
-  const hue = ok ? hexToHue(hex) : 252;
-  if (animate && window.Motion) Motion.hueTo(hue);
-  else document.documentElement.style.setProperty('--brand-hue', String(hue));
+  const { h, s, l } = ok ? hexToHslFull(hex) : { h: 252, s: 65, l: 55 };
+  const root = document.documentElement;
+  root.style.setProperty('--brand-sat', s + '%');
+  root.style.setProperty('--brand-light', l + '%');
+  if (animate && window.Motion) Motion.hueTo(h);
+  else root.style.setProperty('--brand-hue', String(h));
 }
 
 function applySettingsLook(s) {
@@ -65,7 +72,11 @@ function applySettingsLook(s) {
   window.__themePref = s.theme || 'system';
   applyTheme(window.__themePref);
   if (s.accent) applyAccent(s.accent);
-  else document.documentElement.style.setProperty('--brand-hue', '262');
+  else {
+    document.documentElement.style.setProperty('--brand-hue', '262');
+    document.documentElement.style.setProperty('--brand-sat', '65%');
+    document.documentElement.style.setProperty('--brand-light', '55%');
+  }
   window.__barStyle = s.bar_style === 'ring' ? 'ring' : 'bar';
 }
 
@@ -101,6 +112,17 @@ function resetAtText(unixSecs) {
   const d = new Date(unixSecs * 1000);
   const pad = (n) => String(n).padStart(2, '0');
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** 重置倒计时："03h02m"，跨天 "1d3h24m"；已过期返回空 */
+function countdownText(unixSecs) {
+  const secs = Math.floor(unixSecs - Date.now() / 1000);
+  if (secs <= 0) return '';
+  const m = Math.floor(secs / 60);
+  const d = Math.floor(m / 1440);
+  const h = Math.floor((m % 1440) / 60);
+  const pad = (n) => String(n).padStart(2, '0');
+  return d > 0 ? `${d}d${h}h${pad(m % 60)}m` : `${pad(h)}h${pad(m % 60)}m`;
 }
 
 function fmtClock(unixSecs) {
@@ -174,8 +196,10 @@ function rowHtml(view, opts = {}) {
         const u = w.used_percent;
         const reset = w.reset_at ? resetAtText(w.reset_at) : '';
         const urgentLine = isUrgent(u) || (100 - u <= (view.plan.threshold ?? 0)) ? 'urgent' : '';
+        // 用尽且有明确重置时刻 → 遮罩倒计时（金额行/无重置时刻不参与）
+        const cd = w.reset_at && u >= 100 ? countdownText(w.reset_at) : '';
         return `
-        <div class="win-line ${urgentLine}">
+        <div class="win-line ${urgentLine}${cd ? ' resetting' : ''}"${cd ? ` data-reset-at="${w.reset_at}" data-countdown="${cd}"` : ''}>
           <span>${esc(w.label)}</span>
           <div class="bar slim ${urgentLine ? 'urgent-fill' : ''}"><i data-w="${u.toFixed(1)}"></i></div>
           <b data-count="${u}" data-fmt="${u < 10 ? 'pct1' : 'pct0'}">${u.toFixed(u < 10 ? 1 : 0)}%</b>
@@ -277,3 +301,13 @@ function toast(msg, warn) {
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
 }
+
+// ─── 遮罩倒计时滚动 ───────────────────────────────────────────
+// 只改 data-countdown 文本，不重渲染；归零解除遮罩（等后端轮询出新数据）
+setInterval(() => {
+  document.querySelectorAll('.win-line.resetting').forEach((el) => {
+    const t = countdownText(parseFloat(el.dataset.resetAt));
+    if (t) el.dataset.countdown = t;
+    else el.classList.remove('resetting');
+  });
+}, 30000);

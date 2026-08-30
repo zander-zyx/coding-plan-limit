@@ -2,12 +2,14 @@
 //! 移植自 claude-mini-hud src/usage.ts，并对齐 cc-switch 的实现细节。
 
 pub mod balances;
+pub mod grok;
 pub mod http;
 pub mod kimi_coding;
 pub mod minimax;
 pub mod newapi;
 pub mod official;
 pub mod types;
+pub mod volcengine;
 pub mod zhipu;
 
 use types::{PlanConfig, Quota, Snapshot, Template};
@@ -19,6 +21,12 @@ pub struct Credential {
     pub cookie: Option<String>,
     pub ak_id: Option<String>,
     pub ak_secret: Option<String>,
+    /// Codex 多账号：捕获副本的 access_token（只读不刷新）
+    pub codex_token: Option<String>,
+    /// Codex 多账号：捕获副本的 ChatGPT workspace ID
+    pub codex_account: Option<String>,
+    /// Codex 多账号：自管托管账号本地 ID（查询时经 valid_access 解析）
+    pub codex_managed: Option<String>,
 }
 
 /// 内置模板清单。窗口型"有啥显示啥"——接口不返回的窗口不展示。
@@ -55,6 +63,16 @@ pub fn templates() -> Vec<Template> {
             homepage: "https://www.kimi.com/code/console".into(),
         },
         Template {
+            id: "volcengine".into(),
+            name: "火山方舟 Coding Plan".into(),
+            description: "5小时 / 7天 / 30天窗口（火山账号 AccessKey 签名查询）".into(),
+            auth: "bss".into(),
+            quota_type: "windows".into(),
+            has_region: false,
+            needs_base_url: false,
+            homepage: "https://console.volcengine.com/ark/region:ark+cn-beijing/openManagement?advancedActiveKey=subscribe".into(),
+        },
+        Template {
             id: "claude-official".into(),
             name: "Claude Official".into(),
             description: "官方订阅 5小时 / 周限额（读取本机 Claude CLI 登录凭据）".into(),
@@ -66,13 +84,23 @@ pub fn templates() -> Vec<Template> {
         },
         Template {
             id: "codex".into(),
-            name: "Codex / ChatGPT".into(),
+            name: "OpenAI / ChatGPT".into(),
             description: "官方订阅窗口额度（读取本机 Codex CLI 登录凭据）".into(),
             auth: "none".into(),
             quota_type: "windows".into(),
             has_region: false,
             needs_base_url: false,
             homepage: "https://chatgpt.com".into(),
+        },
+        Template {
+            id: "grok".into(),
+            name: "xAI Grok".into(),
+            description: "SuperGrok 订阅窗口额度（读取本机 Grok CLI 登录凭据）".into(),
+            auth: "none".into(),
+            quota_type: "windows".into(),
+            has_region: false,
+            needs_base_url: false,
+            homepage: "https://x.ai/grok".into(),
         },
         Template {
             id: "deepseek".into(),
@@ -115,6 +143,26 @@ pub fn templates() -> Vec<Template> {
             homepage: "https://cloud.siliconflow.cn".into(),
         },
         Template {
+            id: "openrouter".into(),
+            name: "OpenRouter".into(),
+            description: "账户余额（按量计费）".into(),
+            auth: "bearer".into(),
+            quota_type: "balance".into(),
+            has_region: false,
+            needs_base_url: false,
+            homepage: "https://openrouter.ai/credits".into(),
+        },
+        Template {
+            id: "novita".into(),
+            name: "Novita AI".into(),
+            description: "账户余额（按量计费）".into(),
+            auth: "bearer".into(),
+            quota_type: "balance".into(),
+            has_region: false,
+            needs_base_url: false,
+            homepage: "https://novita.ai".into(),
+        },
+        Template {
             id: "newapi".into(),
             name: "NewAPI / OneAPI 站点".into(),
             description: "填站点地址；币种跟随站点后台设置".into(),
@@ -151,14 +199,24 @@ pub async fn query(plan: &PlanConfig, cred: &Credential) -> Result<Quota, String
             .await
         }
         "kimi-coding" => kimi_coding::query(require(cred.bearer.as_deref(), "API Key")?).await,
+        "volcengine" => {
+            volcengine::query(
+                require(cred.ak_id.as_deref(), "AccessKey ID")?,
+                require(cred.ak_secret.as_deref(), "AccessKey Secret")?,
+            )
+            .await
+        }
         "claude-official" => official::claude().await,
-        "codex" => official::codex().await,
+        "codex" => official::codex(cred).await,
+        "grok" => grok::query().await,
         "deepseek" => balances::deepseek(require(cred.bearer.as_deref(), "API Key")?).await,
         "kimi" => balances::kimi(region, require(cred.bearer.as_deref(), "API Key")?).await,
         "stepfun" => balances::stepfun(region, require(cred.bearer.as_deref(), "API Key")?).await,
         "siliconflow" => {
             balances::siliconflow(region, require(cred.bearer.as_deref(), "API Key")?).await
         }
+        "openrouter" => balances::openrouter(require(cred.bearer.as_deref(), "API Key")?).await,
+        "novita" => balances::novita(require(cred.bearer.as_deref(), "API Key")?).await,
         // NewAPI 系（OpenAI 兼容计费接口）
         "newapi" => {
             let base = plan

@@ -9,6 +9,7 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod codex_oauth;
 mod commands;
 mod scheduler;
 mod state;
@@ -56,6 +57,12 @@ fn main() {
             commands::get_config_dir,
             commands::open_external,
             commands::reorder_plans,
+            commands::codex_login_start,
+            commands::codex_login_poll,
+            commands::codex_accounts,
+            commands::codex_account_delete,
+            commands::codex_capture_for_plan,
+            commands::codex_bind_plan,
             update::check_update,
             update::get_update_info,
             update::download_and_install,

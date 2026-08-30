@@ -1,7 +1,7 @@
 //! 托盘图标 + 悬停弹窗控制。
 //! Windows：悬停即显示；macOS / Linux：左键点击切换（系统托盘 API 不支持悬停事件）。
 
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -14,6 +14,8 @@ use crate::state::HIDE_GEN;
 
 /// 最近一次托盘图标区域 (x, y, w, h)（物理像素），供弹窗高度变化后重新定位
 pub static LAST_TRAY_RECT: Mutex<Option<(f64, f64, f64, f64)>> = Mutex::new(None);
+/// 最近一次弹窗触发重推/刷新的时刻（unix 秒）：冷却内重开沿用现有画面
+pub static LAST_POPUP_SHOW: AtomicI64 = AtomicI64::new(0);
 
 /// 屏幕底部安全边距（Windows 任务栏高度 ~48px，留余量）
 const TASKBAR_SAFE: f64 = 64.0;
@@ -153,6 +155,17 @@ pub fn show_popup_at(app: &AppHandle, rect: Rect) {
 
     position_popup(app);
     let _ = win.show();
+
+    // 冷却内重开（悬停连击/移出再进入）：窗口隐藏非销毁，画面原样保留，
+    // 不重推视图也不触发刷新，避免每次进入都重渲染重播进度条动画；0 = 关闭
+    let cooldown = crate::store::load_settings(app).popup_cooldown_secs as i64;
+    if cooldown > 0 {
+        let now = crate::usage::types::now_secs();
+        if now - LAST_POPUP_SHOW.load(Ordering::Relaxed) < cooldown {
+            return;
+        }
+        LAST_POPUP_SHOW.store(now, Ordering::Relaxed);
+    }
 
     // 打开弹窗：数据 60s 内刷新过就只重推视图，否则强制刷新一轮（互斥防并发）
     let app = app.clone();

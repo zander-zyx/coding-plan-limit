@@ -155,10 +155,56 @@ pub fn load_credential(app: &tauri::AppHandle, plan: &PlanConfig) -> crate::usag
             cred.ak_id = take(read_secret(app, &config, &plan.id, "ak_id"));
             cred.ak_secret = take(read_secret(app, &config, &plan.id, "ak_secret"));
         }
-        // none：无需密钥（claude-official/codex 读本机 CLI 凭据）
-        _ => {}
+        // none：claude-official 无密钥；codex 多账号读捕获副本/托管绑定槽
+        _ => {
+            cred.codex_token = take(read_secret(app, &config, &plan.id, "codex_token"));
+            cred.codex_account = take(read_secret(app, &config, &plan.id, "codex_account"));
+            cred.codex_managed = take(read_secret(app, &config, &plan.id, "codex_managed"));
+        }
     }
     cred
+}
+
+/// 查询前解析：托管账号绑定 → 换取有效 access_token（必要时刷新，轮换写回存储）
+pub async fn resolve_managed_credential(
+    app: &tauri::AppHandle,
+    mut cred: crate::usage::Credential,
+) -> Result<crate::usage::Credential, String> {
+    if let Some(id) = cred.codex_managed.clone().filter(|s| !s.is_empty()) {
+        let (token, ws) = crate::codex_oauth::valid_access(app, &id).await?;
+        cred.codex_token = Some(token);
+        cred.codex_account = Some(ws);
+    }
+    Ok(cred)
+}
+
+/// 删除单个密钥槽（凭据库 + 明文兜底）
+pub fn delete_secret_slot(app: &tauri::AppHandle, plan_id: &str, suffix: &str) {
+    if let Ok(entry) = keyring_entry(&entry_user(plan_id, suffix)) {
+        let _ = entry.delete_credential();
+    }
+    let _ = update_config(app, |config| {
+        config.fallback_secrets.remove(&format!("{plan_id}:{suffix}"));
+    });
+}
+
+/// 直写明文兜底（静默）。超长密钥专用：Windows 凭据库单条上限 2560 个 UTF-16
+/// 字符，Codex 的 access_token（大 JWT）必然超限，走 keyring 注定失败还弹警告。
+pub fn save_secret_plain(
+    app: &tauri::AppHandle,
+    plan_id: &str,
+    suffix: &str,
+    value: &str,
+) -> Result<(), String> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Ok(());
+    }
+    update_config(app, |config| {
+        config
+            .fallback_secrets
+            .insert(format!("{plan_id}:{suffix}"), value.to_string());
+    })
 }
 
 fn read_secret(_app: &tauri::AppHandle, config: &Config, plan_id: &str, suffix: &str) -> Option<String> {
@@ -217,7 +263,7 @@ pub fn save_secret(
 }
 
 pub fn delete_secret(app: &tauri::AppHandle, plan_id: &str) {
-    for suffix in ["key", "cookie", "ak_id", "ak_secret"] {
+    for suffix in ["key", "cookie", "ak_id", "ak_secret", "codex_token", "codex_account", "codex_managed"] {
         if let Ok(entry) = keyring_entry(&entry_user(plan_id, suffix)) {
             let _ = entry.delete_credential();
         }

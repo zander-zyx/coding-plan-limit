@@ -788,3 +788,102 @@ fn emit_views(app: &AppHandle) {
         scheduler::emit_views(&app).await;
     });
 }
+
+// ─── Codex 多账号（捕获副本 + 自管托管） ──────────────────────────────────
+
+#[derive(serde::Serialize)]
+pub struct CodexLoginStart {
+    pub user_code: String,
+    pub verification_url: String,
+    pub device_code: String,
+    pub expires_in: u64,
+}
+
+#[tauri::command]
+pub async fn codex_login_start() -> Result<CodexLoginStart, String> {
+    let s = crate::codex_oauth::login_start().await?;
+    Ok(CodexLoginStart {
+        user_code: s.user_code,
+        verification_url: s.verification_url.to_string(),
+        device_code: s.device_code,
+        expires_in: s.expires_in,
+    })
+}
+
+#[derive(serde::Serialize)]
+pub struct CodexLoginPoll {
+    /// pending = 等待用户在浏览器确认；done = 登录成功
+    pub status: String,
+    pub account: Option<crate::codex_oauth::ManagedAccount>,
+    pub error: Option<String>,
+}
+
+#[tauri::command]
+pub async fn codex_login_poll(
+    app: AppHandle,
+    device_code: String,
+    user_code: String,
+) -> Result<CodexLoginPoll, String> {
+    match crate::codex_oauth::login_poll(&app, &device_code, &user_code).await {
+        Ok(Some(acc)) => Ok(CodexLoginPoll {
+            status: "done".into(),
+            account: Some(acc),
+            error: None,
+        }),
+        Ok(None) => Ok(CodexLoginPoll {
+            status: "pending".into(),
+            account: None,
+            error: None,
+        }),
+        Err(e) => {
+            crate::commands::debug_log(&app, &format!("codex_login_poll 失败: {e}"));
+            Ok(CodexLoginPoll {
+                status: "error".into(),
+                account: None,
+                error: Some(e),
+            })
+        }
+    }
+}
+
+#[tauri::command]
+pub fn codex_accounts(app: AppHandle) -> Vec<crate::codex_oauth::ManagedAccount> {
+    crate::codex_oauth::list_accounts(&app)
+}
+
+#[tauri::command]
+pub fn codex_account_delete(app: AppHandle, account_id: String) -> Result<(), String> {
+    crate::codex_oauth::delete_account(&app, &account_id)
+}
+
+/// 捕获当前 ~/.codex/auth.json 为套餐私有副本（只读不刷新，与 CC Switch 零冲突）。
+/// access_token 是超大 JWT，超出系统凭据库 2560 字符上限，直写明文兜底（静默）。
+#[tauri::command]
+pub fn codex_capture_for_plan(app: AppHandle, plan_id: String) -> Result<Option<String>, String> {
+    let (token, account) = crate::codex_oauth::capture_current()?;
+    // 捕获与托管互斥：清除托管绑定
+    store::delete_secret_slot(&app, &plan_id, "codex_managed");
+    store::save_secret_plain(&app, &plan_id, "codex_token", &token)?;
+    store::save_secret_plain(&app, &plan_id, "codex_account", account.as_deref().unwrap_or(""))?;
+    scheduler::request_refresh(&app);
+    Ok(None)
+}
+
+/// 绑定/解绑托管账号：None = 恢复跟随本机当前登录
+#[tauri::command]
+pub fn codex_bind_plan(
+    app: AppHandle,
+    plan_id: String,
+    account_id: Option<String>,
+) -> Result<(), String> {
+    let id = account_id.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    store::delete_secret_slot(&app, &plan_id, "codex_token");
+    store::delete_secret_slot(&app, &plan_id, "codex_account");
+    if let Some(id) = id {
+        store::save_secret(&app, &plan_id, "codex_managed", id)?;
+    } else {
+        store::delete_secret_slot(&app, &plan_id, "codex_managed");
+    }
+    scheduler::request_refresh(&app);
+    Ok(())
+}

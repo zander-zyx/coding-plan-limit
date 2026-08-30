@@ -151,8 +151,16 @@ fn read_codex_token() -> Result<(String, Option<String>), String> {
     Ok((token, account))
 }
 
-pub async fn codex() -> Result<Quota, String> {
+pub async fn codex(cred: &super::Credential) -> Result<Quota, String> {
+    // 账号来源优先级：捕获副本 / 托管账号（scheduler 已解析为 codex_token）> 跟随本机当前登录
+    if let Some(token) = cred.codex_token.clone().filter(|s| !s.is_empty()) {
+        return codex_usage(token, cred.codex_account.clone()).await;
+    }
     let (token, account) = read_codex_token()?;
+    codex_usage(token, account).await
+}
+
+async fn codex_usage(token: String, account: Option<String>) -> Result<Quota, String> {
     let mut headers = vec![
         ("Authorization", format!("Bearer {token}")),
         ("User-Agent", "codex-cli".to_string()),

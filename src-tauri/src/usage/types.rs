@@ -94,7 +94,7 @@ pub struct PlanConfig {
     pub name: String,
     #[serde(default = "default_true")]
     pub enabled: bool,
-    /// 提醒阈值：窗口/固定额度型为已用百分比；余额型为货币金额下限
+    /// 提醒阈值：窗口/固定额度型为剩余百分比下限；余额型为货币金额下限
     #[serde(default = "default_threshold")]
     pub threshold: f64,
     /// cn | intl
@@ -159,6 +159,9 @@ pub struct Settings {
     /// 悬浮弹窗固定展示的套餐 id（1-10 家，按顺序展示；其余收进"更多"）
     #[serde(default)]
     pub popup_plan_ids: Vec<String>,
+    /// 悬浮弹窗重开冷却（秒）：冷却内再进入沿用现有画面不刷新；0 = 关闭冷却
+    #[serde(default = "default_popup_cooldown")]
+    pub popup_cooldown_secs: u32,
     /// 自定义主题色（#RRGGBB；None = 默认蓝）
     #[serde(default)]
     pub accent: Option<String>,
@@ -187,6 +190,10 @@ fn default_bar_style() -> String {
     "bar".to_string()
 }
 
+fn default_popup_cooldown() -> u32 {
+    8
+}
+
 fn default_refresh_seconds() -> u32 {
     30
 }
@@ -213,6 +220,7 @@ impl Default for Settings {
             theme: default_theme(),
             custom_icon: None,
             popup_plan_ids: Vec::new(),
+            popup_cooldown_secs: default_popup_cooldown(),
             accent: None,
             bar_style: default_bar_style(),
             logo_style: default_logo_style(),

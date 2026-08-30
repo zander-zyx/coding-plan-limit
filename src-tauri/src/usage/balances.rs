@@ -1,5 +1,5 @@
-//! 余额类套餐查询：DeepSeek / Kimi(Moonshot) / StepFun / SiliconFlow
-//! 原逻辑参考 claude-mini-hud usage.ts。
+//! 余额类套餐查询：DeepSeek / Kimi(Moonshot) / StepFun / SiliconFlow / OpenRouter / Novita AI
+//! 原逻辑参考 claude-mini-hud usage.ts；OpenRouter/Novita 对齐 cc-switch services/balance.rs。
 
 use super::http::{f64_of, get_json, str_of};
 use super::types::Quota;
@@ -103,4 +103,29 @@ pub async fn siliconflow(region: &str, bearer: &str) -> Result<Quota, String> {
     let note = f64_of(d, "balance").map(|b| format!("充值 ¥{b:.2}"));
     let _ = str_of(d, "id"); // 保持字段引用完整性
     Ok(balance(total, if region == "intl" { "USD" } else { "CNY" }, note))
+}
+
+/// OpenRouter 余额：total_credits − total_usage，USD（字段可能为数字或数字字符串）
+pub async fn openrouter(bearer: &str) -> Result<Quota, String> {
+    let json = get_json(
+        "https://openrouter.ai/api/v1/credits",
+        &[("Authorization", format!("Bearer {bearer}"))],
+    )
+    .await?;
+    let d = json.get("data").unwrap_or(&json);
+    let total = f64_of(d, "total_credits").ok_or("响应中无 total_credits 字段")?;
+    let used = f64_of(d, "total_usage").unwrap_or(0.0);
+    let note = Some(format!("充值 ${total:.2} · 已用 ${used:.2}"));
+    Ok(balance(total - used, "USD", note))
+}
+
+/// Novita AI 余额：availableBalance 单位为 0.0001 USD，需除以 10000
+pub async fn novita(bearer: &str) -> Result<Quota, String> {
+    let json = get_json(
+        "https://api.novita.ai/v3/user/balance",
+        &[("Authorization", format!("Bearer {bearer}"))],
+    )
+    .await?;
+    let raw = f64_of(&json, "availableBalance").ok_or("响应中无 availableBalance 字段")?;
+    Ok(balance(raw / 10000.0, "USD", None))
 }

@@ -60,7 +60,12 @@ pub async fn refresh_all(app: &AppHandle) {
 
     let futs = enabled.iter().map(|plan| {
         let cred = store::load_credential(app, plan);
-        async move { usage::snapshot(plan, &cred).await }
+        async move {
+            match store::resolve_managed_credential(app, cred).await {
+                Ok(c) => usage::snapshot(plan, &c).await,
+                Err(e) => Snapshot::fail(&plan.id, e),
+            }
+        }
     });
     let snapshots: Vec<Snapshot> = join_all(futs).await;
 

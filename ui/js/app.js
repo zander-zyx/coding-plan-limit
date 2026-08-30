@@ -9,7 +9,8 @@ const state = {
   selectedTpl: null,
   tplVariant: 'kimi',
   pendingLogo: null,
-  accentPresets: ['#7c5cff', '#3f7cff', '#16c8b7', '#f59e0b', '#fb7185', '#0ea5a3'],
+  nameDirty: false, // 套餐名称是否被用户手动改过：没改过则随模板切换刷新默认名
+  accentPresets: ['#7c5cff', '#3f7cff', '#16c8b7', '#f59e0b', '#fb7185', '#0ea5a3', '#000000'],
 };
 
 // ─── 视图切换 ─────────────────────────────────────────────────
@@ -63,10 +64,8 @@ function renderPlans() {
       el.addEventListener('click', () => openModal(el.dataset.edit)));
     box.querySelectorAll('[data-del]').forEach((el) =>
       el.addEventListener('click', () => {
-        if (el.dataset.armed) { removePlan(el.dataset.del); return; }
-        el.dataset.armed = '1';
-        el.textContent = '确认删除';
-        setTimeout(() => { el.dataset.armed = ''; el.textContent = '删除'; }, 2500);
+        const view = state.views.find((v) => v.plan.id === el.dataset.del);
+        askDeletePlan(el.dataset.del, view?.plan.name || '');
       }));
   } catch (e) {
     $('plan-list').innerHTML = `<div class="p-empty" style="color:var(--urgent)">列表渲染异常：${esc(String(e && e.message || e))}</div>`;
@@ -158,7 +157,7 @@ function setupDrag(box) {
 // 品牌短名（模板卡与默认套餐名）
 const SHORT_LABEL = {
   minimax: 'MiniMax', zhipu: '智谱GLM', 'kimi-coding': 'Kimi', 'claude-official': 'Claude',
-  codex: 'Codex', deepseek: 'DeepSeek',
+  codex: 'OpenAI', deepseek: 'DeepSeek',
   kimi: 'Kimi', stepfun: '阶跃', siliconflow: '硅基流动',
   newapi: 'NewAPI', sub2api: 'Sub2API',
 };
@@ -211,17 +210,35 @@ function renderFormFields() {
   $('f-cookie-key-item').hidden = t.auth !== 'cookie';
   $('f-ak-item').hidden = t.auth !== 'bss';
   $('f-ak-secret-item').hidden = t.auth !== 'bss';
+  $('ak-hint').textContent = t.id === 'volcengine'
+    ? '火山引擎账号 AccessKey（IAM 密钥，非方舟推理 API Key），获取：控制台右上角头像 → 访问控制 → API 访问密钥'
+    : '阿里云主账号 RAM 密钥（非 DashScope API Key）';
   $('f-baseurl-item').hidden = !t.needs_base_url;
   $('f-baseurl-hint').textContent = t.id === 'zhipu'
     ? '默认 https://open.bigmodel.cn/api，国际站 https://api.z.ai/api'
     : '必填，例如 https://your-newapi-site.com';
+  // Codex 多账号区块（仅 codex 模板；新建套餐须先保存拿到 plan_id 才能绑定）
+  const isCodex = t.id === 'codex';
+  $('f-codex-item').hidden = !isCodex;
+  if (isCodex) {
+    resetCodexLoginBox();
+    const locked = !state.editingId;
+    // 登录新账号/绑定下拉是全局操作（入托管账号库），不依赖套餐保存；捕获/恢复跟随需要 plan_id
+    ['btn-codex-capture', 'btn-codex-follow']
+      .forEach((id) => ($(id).disabled = locked));
+    $('f-codex-hint').textContent = locked
+      ? '保存套餐后即可绑定账号；可先登录新账号。'
+      : '默认跟随本机 Codex CLI 当前登录的账号。';
+    refreshCodexAccounts();
+  }
 
-  $('f-threshold-label').textContent =
-    t.quota_type === 'balance' ? '余额提醒下限' : '提醒阈值（剩余 %）';
-  $('f-threshold-hint').textContent =
-    t.quota_type === 'balance'
-      ? '账户余额低于该数值时触发系统通知'
-      : '任一窗口剩余百分比低于该值时触发系统通知';
+  // 百分比型：滑杆 + % 尾缀自解释，不放说明文字；余额型：货币无量程，保留数字框 + 短 hint
+  const pctType = t.quota_type !== 'balance';
+  $('f-threshold-label').textContent = pctType ? '提醒阈值（剩余）' : '余额提醒下限';
+  $('f-threshold-range').hidden = !pctType;
+  $('f-threshold-unit').hidden = !pctType;
+  $('f-threshold-hint').hidden = pctType;
+  $('f-threshold-hint').textContent = pctType ? '' : '账户余额低于该数值时触发系统通知';
 
   if (editing) {
     $('f-name').value = keepName || editing.plan.name;
@@ -236,14 +253,23 @@ function renderFormFields() {
     $('f-ak-id').placeholder = ph;
     $('f-ak-secret').placeholder = ph;
   } else {
-    $('f-name').value = keepName || shortLabel(t.id);
+    $('f-name').value = state.nameDirty ? keepName : shortLabel(t.id);
     $('f-region').value = 'cn';
     $('f-baseurl').value = keepBaseUrl;
     $('f-threshold').value = keepThreshold || 10;
     $('f-enabled').checked = true;
     ['f-bearer', 'f-cookie', 'f-cookie-key', 'f-ak-id', 'f-ak-secret'].forEach((id) => ($(id).placeholder = ''));
   }
+  syncThreshold();
   renderLogoPreview();
+}
+
+// 数字框 → 滑杆同步（仅百分比型；只改滑杆显示，不打断用户输入）
+function syncThreshold() {
+  const range = $('f-threshold-range');
+  if (range.hidden) return;
+  const raw = parseFloat($('f-threshold').value);
+  range.value = Number.isFinite(raw) ? Math.min(100, Math.max(0, raw)) : 0;
 }
 
 function renderLogoPreview() {
@@ -302,6 +328,7 @@ function validateForm() {
 
 function openModal(planId) {
   state.editingId = planId || null;
+  state.nameDirty = false; // 每次打开都是新交互，名称重新随模板/原套餐名
   const editing = planId ? state.views.find((v) => v.plan.id === planId) : null;
   const tplId = planId ? editing?.plan.template : null;
   if (tplId === 'kimi' || tplId === 'kimi-coding') {
@@ -329,6 +356,7 @@ function closeModal() {
     state.editingId = null;
     state.selectedTpl = null;
     state.tplVariant = 'kimi';
+    if (typeof resetCodexLoginBox === 'function') resetCodexLoginBox();
     state.pendingLogo = null;
   };
   $('plan-modal').classList.remove('show');
@@ -340,7 +368,16 @@ $('btn-cancel').addEventListener('click', closeModal);
 $('plan-modal').addEventListener('click', (e) => {
   if (e.target === $('plan-modal')) closeModal();
 });
-$('f-name').addEventListener('input', validateForm);
+$('f-name').addEventListener('input', () => {
+  state.nameDirty = true;
+  validateForm();
+});
+
+// 阈值：滑杆 ⇄ 数字框双向联动
+$('f-threshold-range').addEventListener('input', () => {
+  $('f-threshold').value = $('f-threshold-range').value;
+});
+$('f-threshold').addEventListener('input', syncThreshold);
 
 $('seg-kimi-variant').addEventListener('click', (e) => {
   const v = e.target.dataset?.v;
@@ -387,21 +424,30 @@ $('btn-save').addEventListener('click', async () => {
   await reload();
 });
 
-$('btn-delete').addEventListener('click', async () => {
-  if (!state.editingId) return;
-  // 两步确认，与列表行删除一致
-  const b = $('btn-delete');
-  if (!b.dataset.armed) {
-    b.dataset.armed = '1';
-    b.textContent = '确认删除';
-    setTimeout(() => { b.dataset.armed = ''; b.textContent = '删除'; }, 2500);
-    return;
-  }
-  b.dataset.armed = '';
-  b.textContent = '删除';
-  const id = state.editingId;
-  closeModal();
+$('btn-delete').addEventListener('click', () => {
+  const view = state.views.find((v) => v.plan.id === state.editingId);
+  if (view) askDeletePlan(view.plan.id, view.plan.name);
+});
+
+// ─── 删除确认弹层（行内删除与编辑弹窗删除共用） ──────────────────────────
+function askDeletePlan(id, name) {
+  $('confirm-name').textContent = name || '该套餐';
+  $('confirm-modal').dataset.planId = id;
+  $('confirm-modal').classList.add('show');
+  if (window.Motion) Motion.modalIn($('confirm-modal').querySelector('.modal'));
+}
+function closeConfirm() {
+  $('confirm-modal').classList.remove('show');
+}
+$('btn-confirm-cancel').addEventListener('click', closeConfirm);
+$('confirm-modal').addEventListener('click', (e) => {
+  if (e.target === $('confirm-modal')) closeConfirm();
+});
+$('btn-confirm-ok').addEventListener('click', async () => {
+  const id = $('confirm-modal').dataset.planId;
+  closeConfirm();
   await removePlan(id);
+  if (state.editingId === id) closeModal();
 });
 
 // ─── 设置 ─────────────────────────────────────────────────────
@@ -416,9 +462,15 @@ function renderSettings() {
     .map((c) => `<button class="accent-swatch ${((s.accent || '').toLowerCase() === c.toLowerCase()) ? 'active' : ''}" data-c="${c}" style="background:${c}" title="${c}"></button>`)
     .join('');
   $('accent-presets').querySelectorAll('[data-c]').forEach((b) =>
-    b.addEventListener('click', () => saveSettings({ accent: b.dataset.c })));
+    b.addEventListener('click', () => saveSettings({ accent: b.dataset.c }).then(renderSettings)));
   $('accent-picker').value = s.accent || '#7c5cff';
   $('accent-hex').value = (s.accent || '#7c5cff').toUpperCase();
+  // 饱和度/对比度滑杆：从当前主题色反推
+  const curHsl = hexToHslFull(s.accent || '#7c5cff');
+  $('accent-sat').value = curHsl.s;
+  $('accent-sat-num').value = curHsl.s;
+  $('accent-light').value = curHsl.l;
+  $('accent-light-num').value = curHsl.l;
 
   const mode = s.notify_mode || 'interval';
   $('seg-notify').querySelectorAll('button').forEach((b) =>
@@ -429,6 +481,7 @@ function renderSettings() {
   $('in-notify-count').value = s.notify_count ?? 10;
 
   $('in-refresh').value = s.refresh_seconds ?? 30;
+  $('in-popup-cooldown').value = s.popup_cooldown_secs ?? 8;
   $('in-autostart').checked = !!s.autostart;
   $('in-auto-update').checked = s.auto_check_update !== false;
 
@@ -471,7 +524,7 @@ function renderSettings() {
   if (logoStyle === 'custom' && !s.custom_icon) logoStyle = 'color';
   $('seg-logo-style').querySelectorAll('button').forEach((b) =>
     b.classList.toggle('active', b.dataset.v === logoStyle));
-  $('btn-icon-pick').hidden = logoStyle !== 'custom';
+  // 「选择图片」常驻：任何样式下都可换图，选完自动落到自定义
   // 自定义选项本身即预览位：有图显图，无图显 +
   const thumb = $('custom-logo-thumb');
   const plus = $('custom-logo-plus');
@@ -516,6 +569,8 @@ $('in-notify-count').addEventListener('change', (e) =>
 
 $('in-refresh').addEventListener('change', (e) =>
   saveSettings({ refresh_seconds: Math.max(10, parseInt(e.target.value) || 30) }));
+$('in-popup-cooldown').addEventListener('change', (e) =>
+  saveSettings({ popup_cooldown_secs: Math.min(120, Math.max(0, parseInt(e.target.value) || 0)) }));
 $('in-autostart').addEventListener('change', (e) =>
   saveSettings({ autostart: e.target.checked }));
 $('in-auto-update').addEventListener('change', (e) =>
@@ -525,7 +580,7 @@ $('accent-picker').addEventListener('change', (e) => {
   const v = e.target.value;
   if (/^#[0-9a-fA-F]{6}$/.test(v)) {
     $('accent-hex').value = v.toUpperCase();
-    saveSettings({ accent: v });
+    saveSettings({ accent: v }).then(renderSettings);
   }
 });
 $('accent-hex').addEventListener('change', (e) => {
@@ -538,6 +593,40 @@ $('accent-hex').addEventListener('change', (e) => {
   }
 });
 $('accent-reset').addEventListener('click', () => saveSettings({ accent: null }).then(renderSettings));
+
+// ─── 主题色饱和度/对比度滑杆：实时合成 HSL → hex 预览，change 落盘 ─────────
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const k = (n) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  const to = (x) => Math.round(f(x) * 255).toString(16).padStart(2, '0');
+  return `#${to(0)}${to(8)}${to(4)}`.toUpperCase();
+}
+
+function applyAccentFromSliders() {
+  const hue = hexToHslFull($('accent-hex').value || '#7c5cff').h;
+  const hex = hslToHex(hue, +$('accent-sat').value, +$('accent-light').value);
+  $('accent-hex').value = hex;
+  applyAccent(hex, false); // 拖动跟手，无动画
+  return hex;
+}
+
+[['accent-sat', 'accent-sat-num'], ['accent-light', 'accent-light-num']].forEach(([range, num]) => {
+  $(range).addEventListener('input', () => {
+    $(num).value = $(range).value;
+    applyAccentFromSliders();
+  });
+  $(num).addEventListener('input', () => {
+    const v = Math.min(100, Math.max(0, parseInt($(num).value) || 0));
+    $(range).value = v;
+    applyAccentFromSliders();
+  });
+  // 拖动/输入结束才持久化（input 期间只做实时预览）
+  [range, num].forEach((id) => $(id).addEventListener('change', () => {
+    saveSettings({ accent: applyAccentFromSliders() });
+  }));
+});
 
 // ─── Logo（原色 / Mark / 自定义图片，托盘+标题栏+侧边栏同步） ──
 function pickLogoImage() {
@@ -705,3 +794,111 @@ function renderSideLogo() {
     $('side-version').textContent = v;
   } catch { /* 保持占位 */ }
 })();
+
+// ─── Codex 多账号（捕获副本 / 托管登录） ──────────────────────────────────
+let codexPollTimer = null;
+let codexLogin = null; // { deviceCode, userCode }
+
+async function refreshCodexAccounts() {
+  const sel = $('f-codex-account');
+  try {
+    const accounts = await invoke('codex_accounts');
+    sel.innerHTML = '<option value="" disabled selected>选择已登录账号…</option>' +
+      accounts.map((a) => {
+        const label = a.email || `${a.account_id.slice(0, 14)}…`;
+        return `<option value="${esc(a.account_id)}">${esc(label)}</option>`;
+      }).join('');
+  } catch {
+    sel.innerHTML = '<option value="">账号列表加载失败</option>';
+  }
+}
+
+function resetCodexLoginBox() {
+  if (codexPollTimer) { clearInterval(codexPollTimer); codexPollTimer = null; }
+  codexLogin = null;
+  $('codex-login-box').hidden = true;
+  $('codex-login-status').classList.remove('error');
+}
+
+function codexLoginFail(msg) {
+  // 停轮询但保留面板：错误必须可见，否则用户无从得知失败原因
+  if (codexPollTimer) { clearInterval(codexPollTimer); codexPollTimer = null; }
+  const st = $('codex-login-status');
+  st.textContent = msg;
+  st.classList.add('error');
+}
+
+$('btn-codex-capture').addEventListener('click', async () => {
+  if (!state.editingId) return;
+  try {
+    const warning = await invoke('codex_capture_for_plan', { planId: state.editingId });
+    $('f-codex-hint').textContent = warning
+      ? `已捕获，但${warning}`
+      : '已捕获当前登录为本套餐副本（不自动刷新，凭据过期后需重新捕获）。';
+  } catch (e) {
+    toast(String(e));
+  }
+});
+
+$('btn-codex-login').addEventListener('click', async () => {
+  try {
+    const s = await invoke('codex_login_start', {});
+    codexLogin = { deviceCode: s.device_code, userCode: s.user_code };
+    $('codex-user-code').textContent = s.user_code;
+    $('codex-login-status').textContent = '等待授权…';
+    $('codex-login-box').hidden = false;
+    if (codexPollTimer) clearInterval(codexPollTimer);
+    codexPollTimer = setInterval(async () => {
+      try {
+        const r = await invoke('codex_login_poll', {
+          deviceCode: codexLogin.deviceCode,
+          userCode: codexLogin.userCode,
+        });
+        if (r.status === 'done') {
+          resetCodexLoginBox();
+          await refreshCodexAccounts();
+          $('f-codex-hint').textContent = '登录成功，可在上方下拉中选择并绑定该账号。';
+        } else if (r.status === 'error') {
+          codexLoginFail(r.error || '登录失败，请重试');
+        }
+      } catch (e) {
+        codexLoginFail(String(e));
+      }
+    }, 2500);
+  } catch (e) {
+    toast(String(e));
+  }
+});
+
+$('btn-codex-open').addEventListener('click', () => {
+  invoke('open_external', { url: 'https://auth.openai.com/codex/device' }).catch(() => {});
+});
+
+$('btn-codex-copy').addEventListener('click', () => {
+  if (codexLogin) navigator.clipboard?.writeText(codexLogin.userCode).catch(() => {});
+});
+
+$('btn-codex-bind').addEventListener('click', async () => {
+  const id = $('f-codex-account').value;
+  if (!id) return;
+  if (!state.editingId) {
+    $('f-codex-hint').textContent = '先保存套餐，再回来绑定账号。';
+    return;
+  }
+  try {
+    await invoke('codex_bind_plan', { planId: state.editingId, accountId: id });
+    $('f-codex-hint').textContent = '已绑定所选托管账号。';
+  } catch (e) {
+    toast(String(e));
+  }
+});
+
+$('btn-codex-follow').addEventListener('click', async () => {
+  if (!state.editingId) return;
+  try {
+    await invoke('codex_bind_plan', { planId: state.editingId, accountId: null });
+    $('f-codex-hint').textContent = '已恢复跟随本机当前登录。';
+  } catch (e) {
+    toast(String(e));
+  }
+});

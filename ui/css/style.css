@@ -9,9 +9,11 @@
 
 :root {
   --brand-hue: 252;
-  --brand: hsl(var(--brand-hue), 65%, 55%);
-  --brand-dim: hsl(var(--brand-hue), 60%, 45%);
-  --brand-glow: hsl(var(--brand-hue), 70%, 65%);
+  --brand-sat: 65%;   /* 用户主题色饱和度（applyAccent 写入） */
+  --brand-light: 55%; /* 用户主题色亮度（"对比度"滑杆映射） */
+  --brand: hsl(var(--brand-hue), var(--brand-sat), var(--brand-light));
+  --brand-dim: hsl(var(--brand-hue), calc(var(--brand-sat) - 5%), calc(var(--brand-light) - 10%));
+  --brand-glow: hsl(var(--brand-hue), calc(var(--brand-sat) + 5%), calc(var(--brand-light) + 10%));
   --brand-aura: hsla(var(--brand-hue), 60%, 55%, 0.08);
   --brand-border: hsla(var(--brand-hue), 50%, 60%, 0.15);
   --brand-ring: hsla(var(--brand-hue), 60%, 60%, 0.2);
@@ -338,9 +340,16 @@ html[data-theme='dark'] .side { background: rgba(255, 255, 255, 0.03); }
 }
 .btn.ghost:hover { border-color: var(--brand); transform: translateY(-1px); }
 .btn.danger { background: none; color: var(--urgent); border: 1px solid var(--hairline); box-shadow: none; }
+.btn.danger.armed { background: var(--urgent); border-color: var(--urgent); color: #ffffff; }
 .txt-btn { font-size: 12px; color: var(--text-s); padding: 4px 6px; border-radius: 6px; transition: color var(--tr), background var(--tr); }
 .txt-btn:hover { color: var(--text-p); background: var(--surface); }
 .txt-btn.danger:hover { color: var(--urgent); }
+/* 两步删除确认的第二态：红色警示胶囊（不换文案，宽度零抖动） */
+.txt-btn.armed, .txt-btn.danger.armed {
+  color: var(--urgent);
+  background: color-mix(in srgb, var(--urgent) 12%, transparent);
+  font-weight: 500;
+}
 
 /* 套餐行（主窗口）：与弹窗同构 + 行内控制区；最小 52px 保证点击热区 */
 #plan-list .row {
@@ -404,6 +413,36 @@ html[data-theme='dark'] .side { background: rgba(255, 255, 255, 0.03); }
 }
 .win-line.urgent span, .win-line.urgent b { color: var(--urgent); }
 
+/* 额度用尽：轻微模糊 + 倒计时遮罩；hover 揭开原始内容，移开恢复 */
+.win-line.resetting { position: relative; }
+.win-line.resetting > span,
+.win-line.resetting > .bar,
+.win-line.resetting > b,
+.win-line.resetting > em {
+  filter: blur(2.5px);
+  opacity: 0.5;
+  transition: filter var(--tr), opacity var(--tr);
+}
+.win-line.resetting::after {
+  content: attr(data-countdown);
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--urgent);
+  pointer-events: none;
+  transition: opacity var(--tr);
+}
+.row:hover .win-line.resetting > span,
+.row:hover .win-line.resetting > .bar,
+.row:hover .win-line.resetting > b,
+.row:hover .win-line.resetting > em { filter: none; opacity: 1; }
+.row:hover .win-line.resetting::after { opacity: 0; }
+
 /* 开关 32×20 */
 .switch { position: relative; width: 32px; height: 20px; flex: none; display: inline-block; }
 .switch input { opacity: 0; width: 100%; height: 100%; position: absolute; cursor: pointer; z-index: 1; }
@@ -443,7 +482,16 @@ input:focus, textarea:focus, select:focus {
   border-color: var(--brand);
   box-shadow: 0 0 0 2px var(--brand-ring);
 }
-input[type='number'] { width: 84px; text-align: center; font-variant-numeric: tabular-nums; }
+input[type='number'] {
+  width: 84px;
+  text-align: center;
+  line-height: 34px; /* 36px 高 − 上下 border，显式行高保证数字垂直居中 */
+  font-variant-numeric: tabular-nums;
+  appearance: textfield;
+}
+/* number 自带的上下调节钮占右侧宽度，会把 text-align:center 的数字挤偏，隐藏 */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type='color'] {
   width: 20px; height: 20px;
   padding: 0;
@@ -517,6 +565,68 @@ input[type='color']:hover { border-color: var(--brand); }
 .set-row .label { font-size: 13px; font-weight: 400; }
 .setting-ctl { flex: none; display: flex; align-items: center; gap: 8px; }
 
+/* 信息图标 + 悬停说明气泡（设置页 label 后缀，纯 CSS 无 JS） */
+.info-i {
+  position: relative;
+  display: inline-flex;
+  margin-left: 4px;
+  vertical-align: -2px;
+  color: var(--text-t);
+  cursor: help;
+  transition: color var(--tr);
+}
+.info-i:hover { color: var(--text-s); }
+.info-i::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: -6px;
+  bottom: calc(100% + 9px);
+  width: max-content;
+  max-width: 240px;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  color: var(--text-s);
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: left;
+  white-space: normal;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(3px);
+  transition: opacity var(--tr), transform var(--tr), visibility 0s var(--tr);
+  pointer-events: none;
+  z-index: 50;
+}
+.info-i::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  bottom: calc(100% + 5px);
+  width: 8px;
+  height: 8px;
+  background: var(--bg-elev);
+  border-right: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  transform: rotate(45deg);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--tr), visibility 0s var(--tr);
+  z-index: 51;
+}
+.info-i:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition: opacity var(--tr), transform var(--tr);
+}
+.info-i:hover::before {
+  opacity: 1;
+  visibility: visible;
+}
+
 .seg {
   display: flex;
   gap: 2px;
@@ -585,6 +695,12 @@ input[type='color']:hover { border-color: var(--brand); }
   transition: opacity var(--tr);
 }
 .modal-mask.show { opacity: 1; pointer-events: auto; }
+/* 删除确认弹层：小尺寸 + 叠在套餐弹层之上 */
+#confirm-modal { z-index: 60; }
+.modal.confirm { width: min(400px, calc(100vw - 48px)); padding: 20px 24px 18px; }
+.modal.confirm h2 { margin-bottom: 12px; }
+.confirm-text { font-size: 13px; color: var(--text-s); line-height: 1.6; margin-bottom: 4px; }
+.confirm-text span { color: var(--text-p); font-weight: 500; }
 /* 弹层本体 transform 交给 Motion.modalIn/Out(GSAP)；遮罩淡入淡出仍由 .show 驱动 */
 .modal {
   width: min(520px, calc(100vw - 48px));
@@ -615,6 +731,36 @@ input[type='color']:hover { border-color: var(--brand); }
 .tpl-item .t-desc { font-size: 12px; color: var(--text-t); margin-top: 4px; line-height: 1.45; }
 
 .form-grid { display: flex; flex-direction: column; gap: 12px; }
+
+/* Codex 多账号区块：账号下拉行 + 操作行 + 一行式登录面板 */
+.codex-acct { display: flex; flex-direction: column; gap: 8px; }
+.codex-acct-row { display: flex; align-items: center; gap: 8px; }
+.codex-acct select { flex: 1; min-width: 0; }
+.btn.sm { padding: 4px 10px; font-size: 12px; border-radius: 6px; }
+.codex-login {
+  display: flex; align-items: center; gap: 2px;
+  padding: 5px 12px 5px 6px;
+  background: var(--surface);
+  border: 1px solid var(--brand-border);
+  border-radius: 8px;
+}
+.codex-login code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--brand);
+  padding: 3px 6px;
+}
+.codex-login .codex-sep { width: 1px; height: 16px; background: var(--hairline); margin: 0 6px; flex: none; }
+.codex-login .codex-status {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-t);
+  font-variant-numeric: tabular-nums;
+}
+.codex-login .codex-status.error { color: var(--urgent); }
+
 .form-item label { display: block; font-size: 12px; font-weight: 500; color: var(--text-s); margin-bottom: 4px; }
 .form-item input, .form-item select, .form-item textarea { width: 100%; }
 .form-item .hint { font-size: 12px; color: var(--text-t); margin-top: 4px; line-height: 1.45; }
@@ -622,6 +768,16 @@ input[type='color']:hover { border-color: var(--brand); }
 .form-actions .spacer { flex: 1; }
 .check-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .check-row input { accent-color: var(--brand); width: 14px; height: 14px; }
+
+/* 阈值行：滑杆 + 带 % 尾缀的紧凑数字框（余额型隐藏滑杆与尾缀） */
+.threshold-row { display: flex; align-items: center; gap: 10px; }
+.threshold-row input[type='range'] { flex: 1; height: 36px; accent-color: var(--brand); cursor: pointer; }
+.input-unit { position: relative; flex: none; }
+.form-item .input-unit input { width: 84px; padding-right: 26px; }
+.input-unit .unit {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  font-size: 12px; color: var(--text-t); pointer-events: none;
+}
 
 /* ═══════════════ Toast（仅错误） ═══════════════ */
 #toast {
