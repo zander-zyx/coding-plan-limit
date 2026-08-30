@@ -587,7 +587,9 @@ pub fn prime_window_icon(app: &AppHandle) {
 
 /// 运行中更换窗口图标后，Windows 11 任务栏按钮可能仍缓存旧图：
 /// 主窗口可见时 hide → 短暂等待（让 explorer 销毁旧按钮）→ show 强制重建，
-/// 重建时按钮读取的类图标已在 apply_window_icon 中更新
+/// 重建时按钮读取的类图标已在 apply_window_icon 中更新。
+/// Windows 专属——macOS 无任务栏按钮（窗口 hide/show 只会白闪），Linux 走窗口图标无需重建。
+#[cfg(windows)]
 fn refresh_taskbar_button(win: &tauri::WebviewWindow) {
     if win.is_visible().unwrap_or(false) {
         let _ = win.hide();
@@ -597,9 +599,12 @@ fn refresh_taskbar_button(win: &tauri::WebviewWindow) {
     }
 }
 
-/// 设置主窗口图标并刷新任务栏按钮。
-/// Windows：类图标 + WM_SETICON 双设（仅 WM_SETICON 时任务栏按钮不跟随）；
-/// 失败回落 tauri set_icon（仅窗口级）。
+/// 设置主窗口图标。
+/// Windows：类图标 + WM_SETICON 双设（仅 WM_SETICON 时任务栏按钮不跟随），
+/// 失败回落 tauri set_icon；
+/// macOS：窗口无标题栏图标概念，set_icon 为无害空操作；Dock 图标 tauri 2
+/// 未提供运行时 API（仅 dev 模式嵌入图），自定义 Logo 不跟随 Dock 属已知差距；
+/// Linux（X11）：set_icon 即任务栏图标，正常生效。
 pub fn apply_window_icon(app: &AppHandle, img: &tauri::image::Image<'_>) {
     if let Some(win) = app.get_webview_window("main") {
         #[cfg(windows)]
@@ -613,9 +618,13 @@ pub fn apply_window_icon(app: &AppHandle, img: &tauri::image::Image<'_>) {
                     return;
                 }
             }
+            let _ = win.set_icon(img.clone());
+            refresh_taskbar_button(&win);
         }
-        let _ = win.set_icon(img.clone());
-        refresh_taskbar_button(&win);
+        #[cfg(not(windows))]
+        {
+            let _ = win.set_icon(img.clone());
+        }
     }
 }
 
