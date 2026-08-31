@@ -15,9 +15,8 @@ const SHAPES_FLOAT = [
   { type: 'poly', pts: [498, 476, 628, 476, 526, 548, 394, 548], c: [0x8B, 0x6C, 0xFF] }, // 紫
   { type: 'poly', pts: [350, 580, 482, 580, 368, 660, 236, 660], c: [0xF4, 0xF3, 0xF8] },
 ];
-// macOS 图标规范：1024 画布中主体 824×824 居中（四周 100px 透明边距）、圆角 185，
-// 否则 Dock/任务栏里四角顶满、比其他图标大一圈
-const TILE_BG = { type: 'round', x: 100, y: 100, w: 824, h: 824, r: 185, c: [0x1B, 0x19, 0x22] };
+// 满铺底板（1024 全幅、圆角 232）：用户指定样式，Dock/任务栏中无白角
+const TILE_BG = { type: 'round', x: 0, y: 0, w: 1024, h: 1024, r: 232, c: [0x1B, 0x19, 0x22] };
 const SHAPES_TILE = [TILE_BG, ...SHAPES_FLOAT];
 
 // 凸多边形/矩形 内部测试（叉积同号，边界算内）
