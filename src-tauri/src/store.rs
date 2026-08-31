@@ -8,6 +8,8 @@ use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
+use base64::Engine as _;
+
 use crate::usage::types::{PlanConfig, Settings};
 
 const KEYRING_SERVICE: &str = "coding-plan-limit";

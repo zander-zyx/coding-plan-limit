@@ -231,6 +231,7 @@ impl Default for Settings {
             accent: None,
             bar_style: default_bar_style(),
             logo_style: default_logo_style(),
+            secret_backend: default_secret_backend(),
             auto_check_update: true,
         }
     }
