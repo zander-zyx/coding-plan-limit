@@ -1,7 +1,7 @@
 {
   "name": "coding-plan-limit",
   "private": true,
-  "version": "0.3.28",
+  "version": "0.3.29",
   "description": "聚合展示多个 Coding Plan / Token Plan 套餐剩余额度的本地桌面工具",
   "scripts": {
     "tauri": "tauri",

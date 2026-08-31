@@ -776,7 +776,55 @@ pub fn reset_custom_icon(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// 裁掉 RGBA 图像四周透明边并方形化（外扩 2% 安全边）。
+/// 菜单栏托盘无边距规范：带边距的图标（Dock 规范网格版）在菜单栏会显示偏小，
+/// 因此托盘一律使用裁边后的满铺图；Dock 保持带边距版本。
+pub fn trim_transparent_edges(img: &tauri::image::Image<'_>) -> tauri::image::Image<'static> {
+    let (w, h) = (img.width() as usize, img.height() as usize);
+    let rgba = img.rgba();
+    if w == 0 || h == 0 {
+        return tauri::image::Image::new_owned(rgba.to_vec(), img.width(), img.height());
+    }
+    let (mut min_x, mut min_y, mut max_x, mut max_y) = (w, h, 0usize, 0usize);
+    let mut found = false;
+    for y in 0..h {
+        for x in 0..w {
+            if rgba[(y * w + x) * 4 + 3] > 8 {
+                found = true;
+                min_x = min_x.min(x);
+                max_x = max_x.max(x);
+                min_y = min_y.min(y);
+                max_y = max_y.max(y);
+            }
+        }
+    }
+    if !found {
+        return tauri::image::Image::new_owned(rgba.to_vec(), img.width(), img.height());
+    }
+    let pad = (max_x - min_x).max(max_y - min_y) / 50;
+    let x0 = min_x.saturating_sub(pad);
+    let y0 = min_y.saturating_sub(pad);
+    let x1 = (max_x + pad).min(w - 1);
+    let y1 = (max_y + pad).min(h - 1);
+    let (nw, nh) = (x1 - x0 + 1, y1 - y0 + 1);
+    let side = nw.max(nh).min(w).min(h);
+    let cx = (x0 + x1) / 2;
+    let cy = (y0 + y1) / 2;
+    let sx = cx.saturating_sub(side / 2).min(w - side);
+    let sy = cy.saturating_sub(side / 2).min(h - side);
+    let dx0 = (side - nw) / 2;
+    let dy0 = (side - nh) / 2;
+    let mut out = vec![0u8; side * side * 4];
+    for row in 0..nh {
+        let src = ((y0 + row) * w + x0) * 4;
+        let dst = ((dy0 + row) * side + dx0) * 4;
+        out[dst..dst + nw * 4].copy_from_slice(&rgba[src..src + nw * 4]);
+    }
+    tauri::image::Image::new_owned(out, side as u32, side as u32)
+}
+
 pub fn apply_tray_icon(app: &AppHandle, img: tauri::image::Image<'_>) {
+    let img = trim_transparent_edges(&img);
     match app.tray_by_id("main-tray") {
         Some(tray) => {
             if let Err(e) = tray.set_icon(Some(img)) {

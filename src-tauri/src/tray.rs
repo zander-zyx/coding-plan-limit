@@ -67,9 +67,13 @@ pub fn create(app: &tauri::App) -> tauri::Result<()> {
     let menu = Menu::with_items(app, &[&open, &refresh, &quit])?;
 
     // 初始图标按设置解析（custom 头像 / Mark），无则用应用默认原色图标——
-    // 启动恢复必须在这里做：setup 阶段托盘尚未创建，set_icon 会静默失败
+    // 启动恢复必须在这里做：setup 阶段托盘尚未创建，set_icon 会静默失败。
+    // 菜单栏托盘无边距规范：裁掉透明边距（Dock 规范网格版在菜单栏会偏小）
     let icon = crate::commands::resolve_saved_logo(app.handle())
-        .unwrap_or_else(|| app.default_window_icon().expect("缺少应用图标").clone());
+        .map(|img| crate::commands::trim_transparent_edges(&img))
+        .unwrap_or_else(|| {
+            crate::commands::trim_transparent_edges(&app.default_window_icon().expect("缺少应用图标").clone())
+        });
 
     TrayIconBuilder::with_id("main-tray")
         .icon(icon)
