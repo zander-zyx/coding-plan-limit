@@ -681,14 +681,42 @@ $('seg-logo-style').addEventListener('click', async (e) => {
 
 // ─── 更新（侧边 logo 行小按钮 + 关于页手动检查） ──────────────
 let updateUrl = null;
+let updateAsset = null;
+let downloading = false;
 function showUpdateSide(info) {
   if (info && info.has_update && info.url) {
     updateUrl = info.url;
+    updateAsset = info.asset_url || null;
     $('btn-update-side').hidden = false;
   }
 }
+// 应用内直接下载当前平台安装包，按钮实时显示百分比（与弹窗按钮同款链路）
+async function startSideDownload() {
+  if (downloading || !updateAsset) return;
+  downloading = true;
+  const btn = $('btn-update-side');
+  btn.disabled = true;
+  const original = btn.innerHTML;
+  btn.textContent = '0%';
+  const un = await listen('update-download-progress', (e) => {
+    btn.textContent = `${e.payload}%`;
+  });
+  try {
+    // Windows：下载完成后后端自动启动安装器并退出应用；macOS/Linux 打开所在文件夹
+    await invoke('download_and_install', { url: updateAsset });
+  } catch (e) {
+    toast(String(e));
+  } finally {
+    un();
+    downloading = false;
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }
+}
 $('btn-update-side').addEventListener('click', () => {
-  if (updateUrl) invoke('open_external', { url: updateUrl }).catch(() => {});
+  if (downloading) return;
+  if (updateAsset) startSideDownload();
+  else if (updateUrl) invoke('open_external', { url: updateUrl }).catch(() => {});
 });
 $('btn-check-update').addEventListener('click', async () => {
   const btn = $('btn-check-update');
@@ -702,13 +730,10 @@ $('btn-check-update').addEventListener('click', async () => {
       toast(`检查更新失败：${info.error}`);
     } else if (info.has_update) {
       showUpdateSide(info);
-      toast(`发现新版本 v${info.latest}，点击侧边按钮直接更新`);
-      if (info.asset_url) {
-        updateUrl = info.url;
-        updateAsset = info.asset_url;
-        $('btn-update-side').hidden = false;
-        startSideDownload();
-      }
+      toast(info.asset_url
+        ? `发现新版本 v${info.latest}，正在下载安装包…`
+        : `发现新版本 v${info.latest}，点击侧边按钮前往下载`);
+      if (info.asset_url) startSideDownload();
     } else {
       // 已是最新：toast 明确反馈当前版本
       toast(`已是最新版本 v${info.current}`);
