@@ -61,3 +61,73 @@ jobs:
           # 必须显式传 target：macOS Intel job 跑在 arm64 runner 上，
           # 不传则按宿主机构建出 aarch64 产物（v0.3.19 前 Intel dmg 一直缺失的根因）
           args: --target ${{ join(matrix.targets, ' ') }}
+
+  # 全平台资产上传完毕后，往 Release 说明追加「按系统下载」徽章表格
+  # （shields.io 徽章 + 资产直链，带注释锚点防重复叠加）
+  downloads-table:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Append OS download table to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          from urllib.parse import quote
+
+          token = os.environ["GH_TOKEN"]
+          tag = os.environ["TAG"]
+          repo = "zander-zyx/coding-plan-limit"
+          H = {"Authorization": f"Bearer {token}",
+               "Accept": "application/vnd.github+json",
+               "User-Agent": "release-notes"}
+
+          def badge(label, color):
+              txt = quote(label.replace("-", "--").replace(" ", "_"))
+              return f"https://img.shields.io/badge/{txt}-{color}.svg"
+
+          # 文件名后缀 → (分组, 徽章文本, 颜色)；app.tar.gz 为 updater 产物不对用户展示
+          items = {
+              "x64-setup.exe":  ("Windows", "Setup x64", "007ec6"),
+              "x64_en-US.msi":  ("Windows", "MSI x64", "00599c"),
+              "aarch64.dmg":    ("macOS", "\U0001F34E DMG Apple Silicon", "000000"),
+              "x64.dmg":        ("macOS", "\U0001F34E DMG Intel", "007ec6"),
+              "amd64.AppImage": ("Linux", "AppImage x64", "e05d44"),
+              "amd64.deb":      ("Linux", "Deb x64", "d97509"),
+              "x86_64.rpm":     ("Linux", "RPM x64", "f0a030"),
+          }
+
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{repo}/releases/tags/{tag}", headers=H)
+          rel = json.load(urllib.request.urlopen(req))
+          groups = {}
+          for a in rel["assets"]:
+              for suf, (osname, label, color) in items.items():
+                  if a["name"].endswith(suf):
+                      md = f'[![{label}]({badge(label, color)})]({a["browser_download_url"]})'
+                      groups.setdefault(osname, []).append(md)
+                      break
+
+          rows = [f"| **{o}** | {' '.join(groups[o])} |"
+                  for o in ("Windows", "macOS", "Linux") if o in groups]
+          table = "\n".join(["### 按系统下载（Download based on your OS）", "",
+                             "| 系统 | 安装包 |", "|---|---|", *rows])
+
+          START, END = "<!-- downloads-start -->", "<!-- downloads-end -->"
+          body = rel.get("body") or ""
+          if START in body and END in body:
+              pre, post = body.split(START)[0], body.split(END, 1)[1]
+              body = f"{pre}{START}\n{table}\n{END}{post}"
+          else:
+              body = f"{body.rstrip()}\n\n{START}\n{table}\n{END}" if body else f"{START}\n{table}\n{END}"
+
+          data = json.dumps({"body": body}).encode()
+          preq = urllib.request.Request(
+              f"https://api.github.com/repos/{repo}/releases/{rel['id']}",
+              data=data, headers={**H, "Content-Type": "application/json"}, method="PATCH")
+          urllib.request.urlopen(preq)
+          print("release body updated with download table")
+          PY
