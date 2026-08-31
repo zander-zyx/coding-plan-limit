@@ -124,10 +124,15 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| match event {
-            // 关主窗口 = 最小化到托盘，不退出进程
+            // 关主窗口 = 最小化到托盘，不退出进程；
+            // macOS 同时隐藏 Dock 图标（纯托盘常驻），从托盘菜单打开主窗口时恢复
             WindowEvent::CloseRequested { api, .. } if window.label() == "main" => {
                 api.prevent_close();
                 let _ = window.hide();
+                #[cfg(target_os = "macos")]
+                let _ = window
+                    .app_handle()
+                    .set_activation_policy(tauri::ActivationPolicy::Accessory);
             }
             _ => {}
         })

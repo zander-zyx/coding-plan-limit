@@ -123,6 +123,9 @@ pub fn create(app: &tauri::App) -> tauri::Result<()> {
 }
 
 pub fn show_main(app: &AppHandle) {
+    // 恢复 Dock 图标（关窗驻留托盘时被隐藏为 Accessory）
+    #[cfg(target_os = "macos")]
+    let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
     if let Some(win) = app.get_webview_window("main") {
         // show 前补设：任务栏按钮随 show 创建，创建时图标即为最新值
         crate::commands::prime_window_icon(app);
