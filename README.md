@@ -23,12 +23,26 @@
 
 打开 [Releases 页面](https://github.com/zander-zyx/coding-plan-limit/releases) 下载对应平台安装包：
 
-| 平台 | 文件 |
-|---|---|
-| Windows | `*-x64-setup.exe`（NSIS 向导，**可自行修改安装目录**） |
-| macOS (Apple Silicon) | `*aarch64.dmg`（拖入 Applications） |
-| macOS (Intel) | `*x64.dmg` |
-| Linux | `*.AppImage` / `*.deb` |
+| 系统 | 怎么选 | 文件 |
+|---|---|---|
+| Windows 10/11（64 位） | 常规 PC | `*-x64-setup.exe`（NSIS 向导，**可自行修改安装目录**） |
+| macOS Apple 芯片（M1/M2/M3/M4…） | 2020 年末之后的 Mac 基本都是 | `*_aarch64.dmg`（拖入 Applications） |
+| macOS Intel 芯片 | 2020 年前的老款 Mac | `*_x64.dmg`（拖入 Applications） |
+| Linux | — | `*.AppImage` / `*.deb` |
+
+> 不确定 Mac 是哪种芯片：点左上角  →「关于本机」，「芯片」一栏显示 **Apple M1/M2/M3/M4** 下载 `aarch64`，显示 **Intel** 下载 `x64`。装错了会提示无法运行，换另一个包即可。
+
+### macOS 提示「App 已损坏，无法打开」？
+
+安装包未做 Apple 签名与公证，首次打开会被 Gatekeeper 拦截并**误报「已损坏」**，文件本身是完好的。将 App 拖入「应用程序」文件夹后，任选其一放行：
+
+- 终端执行（推荐）：
+
+  ```bash
+  xattr -cr "/Applications/Plan Limit.app"
+  ```
+
+- 或打开「系统设置 → 隐私与安全性」，页面底部点 **仍要打开**。
 
 每次推送 `v*` 标签会自动构建并发布全平台安装包。
 
