@@ -131,6 +131,161 @@ fn keyring_entry(plan_id: &str) -> Result<keyring::Entry, String> {
         .map_err(|e| format!("凭据库不可用: {e}"))
 }
 
+// ─── 本地加密文件后端（settings.secret_backend = "file"） ─────────────────
+// secrets.bin：AES-256-GCM，密钥由固定盐 + 平台机器标识 + 用户名派生（绑定本机）。
+// 动机：未签名应用在 macOS 每次升级都触发钥匙串授权弹窗，此 后端零弹窗。
+
+const SECRETS_FILE: &str = "secrets.bin";
+const SECRET_SLOTS: [&str; 7] = [
+    "key",
+    "cookie",
+    "ak_id",
+    "ak_secret",
+    "codex_token",
+    "codex_account",
+    "codex_managed",
+];
+
+fn secrets_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Ok(config_dir(app)?.join(SECRETS_FILE))
+}
+
+/// 平台机器标识：macOS IOPlatformUUID / Windows MachineGuid / Linux machine-id
+fn machine_id() -> String {
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(out) = std::process::Command::new("ioreg")
+            .args(["-rd1", "-c", "IOPlatformExpertDevice"])
+            .output()
+        {
+            let s = String::from_utf8_lossy(&out.stdout);
+            if let Some(pos) = s.find("IOPlatformUUID") {
+                if let Some(v) = s[pos..].split('"').nth(1) {
+                    return v.to_string();
+                }
+            }
+        }
+    }
+    #[cfg(windows)]
+    {
+        if let Ok(out) = std::process::Command::new("reg")
+            .args([
+                "query",
+                r"HKLM\SOFTWARE\Microsoft\Cryptography",
+                "/v",
+                "MachineGuid",
+            ])
+            .output()
+        {
+            let s = String::from_utf8_lossy(&out.stdout);
+            if let Some(v) = s.lines().last().and_then(|l| l.split_whitespace().nth(2)) {
+                return v.to_string();
+            }
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(s) = fs::read_to_string("/etc/machine-id") {
+            return s.trim().to_string();
+        }
+    }
+    "unknown-machine".to_string()
+}
+
+/// 加密主密钥：SHA256(固定盐 + 机器标识 + 用户名)，绑定本机，文件被拷走也无法解密
+fn file_enc_key() -> [u8; 32] {
+    use sha2::{Digest, Sha256};
+    let user = std::env::var("USER")
+        .or_else(|_| std::env::var("USERNAME"))
+        .unwrap_or_default();
+    let mut h = Sha256::new();
+    h.update(b"coding-plan-limit/secrets/v1");
+    h.update(machine_id().as_bytes());
+    h.update(user.as_bytes());
+    h.finalize().into()
+}
+
+fn encrypt_b64(key: &[u8; 32], plain: &str) -> Result<String, String> {
+    use aes_gcm::aead::Aead;
+    use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| format!("加密初始化失败: {e}"))?;
+    // nonce 12B：取 UUID v4 的 12 个随机字节（v4 有 122 位随机性，每次写入唯一）
+    let u = uuid::Uuid::new_v4();
+    let nonce = Nonce::from_slice(&u.as_bytes()[4..16]);
+    let ct = cipher
+        .encrypt(nonce, plain.as_bytes())
+        .map_err(|e| format!("加密失败: {e}"))?;
+    let mut packed = Vec::with_capacity(12 + ct.len());
+    packed.extend_from_slice(&u.as_bytes()[4..16]);
+    packed.extend_from_slice(&ct);
+    Ok(base64::engine::general_purpose::STANDARD.encode(packed))
+}
+
+fn decrypt_b64(key: &[u8; 32], packed_b64: &str) -> Option<String> {
+    use aes_gcm::aead::Aead;
+    use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
+    let packed = base64::engine::general_purpose::STANDARD.decode(packed_b64).ok()?;
+    if packed.len() < 13 {
+        return None;
+    }
+    let cipher = Aes256Gcm::new_from_slice(key).ok()?;
+    let pt = cipher
+        .decrypt(Nonce::from_slice(&packed[..12]), &packed[12..])
+        .ok()?;
+    String::from_utf8(pt).ok()
+}
+
+fn secrets_file_load(app: &tauri::AppHandle) -> HashMap<String, String> {
+    let key = file_enc_key();
+    secrets_path(app)
+        .ok()
+        .and_then(|p| fs::read_to_string(p).ok())
+        .and_then(|s| serde_json::from_str::<HashMap<String, String>>(&s).ok())
+        .map(|raw| {
+            raw.into_iter()
+                .filter_map(|(k, v)| decrypt_b64(&key, &v).map(|plain| (k, plain)))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn secrets_file_save(app: &tauri::AppHandle, map: &HashMap<String, String>) -> Result<(), String> {
+    let key = file_enc_key();
+    let raw: HashMap<String, String> = map
+        .iter()
+        .map(|(k, v)| encrypt_b64(&key, v).map(|e| (k.clone(), e)))
+        .collect::<Result<_, _>>()?;
+    let path = secrets_path(app)?;
+    let json = serde_json::to_string(&raw).map_err(|e| format!("序列化失败: {e}"))?;
+    atomic_write(&path, &json)
+}
+
+fn file_get(app: &tauri::AppHandle, k: &str) -> Option<String> {
+    secrets_file_load(app).get(k).cloned()
+}
+
+fn file_set(app: &tauri::AppHandle, k: &str, v: &str) -> Result<(), String> {
+    let mut map = secrets_file_load(app);
+    map.insert(k.to_string(), v.to_string());
+    secrets_file_save(app, &map)
+}
+
+fn file_remove(app: &tauri::AppHandle, k: &str) {
+    let mut map = secrets_file_load(app);
+    if map.remove(k).is_some() {
+        let _ = secrets_file_save(app, &map);
+    }
+}
+
+fn secret_backend_name(app: &tauri::AppHandle) -> String {
+    let b = load_settings(app).secret_backend;
+    if b == "file" {
+        "file".to_string()
+    } else {
+        "keychain".to_string()
+    }
+}
+
 /// 读密钥：凭据库优先，兜底配置文件。
 /// 按模板注册表的 auth 类型分发，新增模板不再需要改这里。
 pub fn load_credential(app: &tauri::AppHandle, plan: &PlanConfig) -> crate::usage::Credential {
@@ -178,11 +333,12 @@ pub async fn resolve_managed_credential(
     Ok(cred)
 }
 
-/// 删除单个密钥槽（凭据库 + 明文兜底）
+/// 删除单个密钥槽（凭据库 + 加密文件 + 明文兜底）
 pub fn delete_secret_slot(app: &tauri::AppHandle, plan_id: &str, suffix: &str) {
     if let Ok(entry) = keyring_entry(&entry_user(plan_id, suffix)) {
         let _ = entry.delete_credential();
     }
+    file_remove(app, &format!("{plan_id}:{suffix}"));
     let _ = update_config(app, |config| {
         config.fallback_secrets.remove(&format!("{plan_id}:{suffix}"));
     });
@@ -200,6 +356,15 @@ pub fn save_secret_plain(
     if value.is_empty() {
         return Ok(());
     }
+    // 加密文件后端无长度限制，超长 JWT 也走加密存储
+    if secret_backend_name(app) == "file" {
+        let slot = format!("{plan_id}:{suffix}");
+        file_set(app, &slot, value)?;
+        let _ = update_config(app, |c| {
+            c.fallback_secrets.remove(&slot);
+        });
+        return Ok(());
+    }
     update_config(app, |config| {
         config
             .fallback_secrets
@@ -207,9 +372,14 @@ pub fn save_secret_plain(
     })
 }
 
-fn read_secret(_app: &tauri::AppHandle, config: &Config, plan_id: &str, suffix: &str) -> Option<String> {
-    // 1) 系统凭据库
-    if let Ok(entry) = keyring_entry(&entry_user(plan_id, suffix)) {
+fn read_secret(app: &tauri::AppHandle, config: &Config, plan_id: &str, suffix: &str) -> Option<String> {
+    let slot = format!("{plan_id}:{suffix}");
+    // 1) 按当前后端优先读取
+    if secret_backend_name(app) == "file" {
+        if let Some(v) = file_get(app, &slot).filter(|v| !v.is_empty()) {
+            return Some(v);
+        }
+    } else if let Ok(entry) = keyring_entry(&entry_user(plan_id, suffix)) {
         if let Ok(v) = entry.get_password() {
             if !v.is_empty() {
                 return Some(v);
@@ -217,7 +387,22 @@ fn read_secret(_app: &tauri::AppHandle, config: &Config, plan_id: &str, suffix: 
         }
     }
     // 2) 明文兜底
-    config.fallback_secrets.get(&format!("{plan_id}:{suffix}")).cloned()
+    if let Some(v) = config.fallback_secrets.get(&slot).filter(|v| !v.is_empty()) {
+        return Some(v.clone());
+    }
+    // 3) 安全网：另一后端残留（切换中断时不丢密钥）
+    if secret_backend_name(app) == "file" {
+        if let Ok(entry) = keyring_entry(&entry_user(plan_id, suffix)) {
+            if let Ok(v) = entry.get_password() {
+                if !v.is_empty() {
+                    return Some(v);
+                }
+            }
+        }
+    } else {
+        return file_get(app, &slot).filter(|v| !v.is_empty());
+    }
+    None
 }
 
 fn entry_user(plan_id: &str, suffix: &str) -> String {
@@ -237,6 +422,18 @@ pub fn save_secret(
 ) -> Result<Option<String>, String> {
     let value = value.trim();
     if value.is_empty() {
+        return Ok(None);
+    }
+    // 本地加密文件后端：零弹窗
+    if secret_backend_name(app) == "file" {
+        let slot = format!("{plan_id}:{suffix}");
+        file_set(app, &slot, value)?;
+        let _ = update_config(app, |c| {
+            c.fallback_secrets.remove(&slot);
+        });
+        if let Ok(entry) = keyring_entry(&entry_user(plan_id, suffix)) {
+            let _ = entry.delete_credential();
+        }
         return Ok(None);
     }
     match keyring_entry(&entry_user(plan_id, suffix)) {
@@ -263,16 +460,105 @@ pub fn save_secret(
 }
 
 pub fn delete_secret(app: &tauri::AppHandle, plan_id: &str) {
-    for suffix in ["key", "cookie", "ak_id", "ak_secret", "codex_token", "codex_account", "codex_managed"] {
+    for suffix in SECRET_SLOTS {
         if let Ok(entry) = keyring_entry(&entry_user(plan_id, suffix)) {
             let _ = entry.delete_credential();
         }
+        file_remove(app, &format!("{plan_id}:{suffix}"));
     }
     let _ = update_config(app, |config| {
         config
             .fallback_secrets
             .retain(|k, _| !k.starts_with(&format!("{plan_id}:")));
     });
+}
+
+/// 切换密钥存储后端并把现有密钥迁到新后端。返回迁移摘要。
+/// 迁移期间 keychain→file 需要读钥匙串，macOS 可能弹一次授权（选"始终允许"）。
+pub fn set_secret_backend(app: &tauri::AppHandle, backend: &str) -> Result<String, String> {
+    let backend = backend.trim();
+    if backend != "keychain" && backend != "file" {
+        return Err(format!("未知存储方式: {backend}"));
+    }
+    if secret_backend_name(app) == backend {
+        return Ok("当前已是该存储方式".to_string());
+    }
+
+    // 先落标记：读写从此走新后端；迁移读旧后端显式进行
+    update_config(app, |c| c.settings.secret_backend = backend.to_string())?;
+
+    let plans = load_plans(app);
+    let mut moved = 0usize;
+    let mut warned: Vec<String> = Vec::new();
+
+    for plan in &plans {
+        for slot in SECRET_SLOTS {
+            let slot_key = format!("{}:{}", plan.id, slot);
+            if backend == "file" {
+                // keychain + 明文兜底 → 加密文件
+                let mut value = file_get(app, &slot_key).filter(|v| !v.is_empty());
+                if value.is_none() {
+                    if let Ok(entry) = keyring_entry(&entry_user(&plan.id, slot)) {
+                        if let Ok(v) = entry.get_password() {
+                            if !v.is_empty() {
+                                value = Some(v);
+                            }
+                        }
+                    }
+                }
+                if let Some(v) = value {
+                    file_set(app, &slot_key, &v)?;
+                    if let Ok(entry) = keyring_entry(&entry_user(&plan.id, slot)) {
+                        let _ = entry.delete_credential();
+                    }
+                    let _ = update_config(app, |c| {
+                        c.fallback_secrets.remove(&slot_key);
+                    });
+                    moved += 1;
+                }
+            } else {
+                // 加密文件 + 明文兜底 → keychain
+                let mut value = file_get(app, &slot_key).filter(|v| !v.is_empty());
+                if value.is_none() {
+                    if let Some(v) = load_config(app).fallback_secrets.get(&slot_key).cloned() {
+                        if !v.is_empty() {
+                            value = Some(v);
+                        }
+                    }
+                }
+                if let Some(v) = value {
+                    match keyring_entry(&entry_user(&plan.id, slot))
+                        .and_then(|e| e.set_password(&v).map_err(|e| e.to_string()))
+                    {
+                        Ok(()) => {
+                            file_remove(app, &slot_key);
+                            let _ = update_config(app, |c| {
+                                c.fallback_secrets.remove(&slot_key);
+                            });
+                            moved += 1;
+                        }
+                        Err(e) => {
+                            // 超长 JWT 等 keyring 存不下的：留在明文兜底并提示
+                            warned.push(format!("{}:{}", plan.name, slot));
+                            let _ = persist_fallback(app, &plan.id, slot, &v);
+                            file_remove(app, &slot_key);
+                            let _ = e;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let target = if backend == "file" { "本地加密文件" } else { "系统凭据库" };
+    let mut summary = format!("已切换到{target}，迁移 {moved} 条密钥");
+    if !warned.is_empty() {
+        summary.push_str(&format!(
+            "；{} 条超长密钥无法入凭据库，已保留明文兜底",
+            warned.len()
+        ));
+    }
+    Ok(summary)
 }
 
 fn persist_fallback(app: &tauri::AppHandle, plan_id: &str, suffix: &str, value: &str) -> Result<(), String> {

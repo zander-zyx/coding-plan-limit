@@ -177,10 +177,17 @@ pub struct Settings {
     /// Logo 样式：color（原色，默认）| mark（Z 标）| custom（应用 custom_icon 图片）；custom_icon 与样式选择独立存档
     #[serde(default = "default_logo_style")]
     pub logo_style: String,
+    /// 密钥存储后端：keychain（系统凭据库，默认）| file（本地加密文件，无钥匙串弹窗）
+    #[serde(default = "default_secret_backend")]
+    pub secret_backend: String,
 }
 
 fn default_logo_style() -> String {
     "color".to_string()
+}
+
+fn default_secret_backend() -> String {
+    "keychain".to_string()
 }
 
 fn default_theme() -> String {

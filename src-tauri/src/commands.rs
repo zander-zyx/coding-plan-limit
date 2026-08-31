@@ -705,6 +705,12 @@ pub fn set_custom_icon(app: AppHandle, data_url: String) -> Result<(), String> {
     Ok(())
 }
 
+/// 切换密钥存储后端：keychain（系统凭据库）| file（本地加密文件），并迁移现有密钥
+#[tauri::command]
+pub fn set_secret_backend(app: AppHandle, backend: String) -> Result<String, String> {
+    store::set_secret_backend(&app, &backend)
+}
+
 /// 切换 Logo 样式：color（原色）| mark（Z 标）| custom（应用存档的自定义图）
 #[tauri::command]
 pub fn set_logo_style(app: AppHandle, style: String) -> Result<(), String> {

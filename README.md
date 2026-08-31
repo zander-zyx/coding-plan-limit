@@ -101,7 +101,7 @@
 | 内容 | 位置 |
 |---|---|
 | 套餐配置 + 设置 | `%APPDATA%\com.zander.coding-plan-limit\config.json`（Win）/ `~/Library/Application Support/...`（mac）/ `~/.config/...`（Linux） |
-| API 密钥 | 系统凭据库；凭据库不可用时降级明文存入 config.json（会弹警告），凭据库恢复后自动清除明文 |
+| API 密钥 | 系统凭据库（默认）或**本地加密文件**（AES-256 加密并绑定本机，设置 → 密钥存储 可切换，升级不再弹钥匙串授权）；凭据库不可用时降级明文存入 config.json（会弹警告），凭据库恢复后自动清除明文 |
 | 最近快照 | 同目录 `snapshots.json` |
 | 配置损坏保护 | config.json 损坏时自动备份为 `config.corrupt.bak` 并**拒绝写入**，绝不静默丢数据 |
 

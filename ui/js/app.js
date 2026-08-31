@@ -458,6 +458,9 @@ function renderSettings() {
   $('seg-theme').querySelectorAll('button').forEach((b) =>
     b.classList.toggle('active', b.dataset.v === (s.theme || 'system')));
 
+  $('seg-secret-backend').querySelectorAll('button').forEach((b) =>
+    b.classList.toggle('active', b.dataset.v === (s.secret_backend || 'keychain')));
+
   $('accent-presets').innerHTML = state.accentPresets
     .map((c) => `<button class="accent-swatch ${((s.accent || '').toLowerCase() === c.toLowerCase()) ? 'active' : ''}" data-c="${c}" style="background:${c}" title="${c}"></button>`)
     .join('');
@@ -690,6 +693,53 @@ $('seg-logo-style').addEventListener('click', async (e) => {
   }
 });
 
+// 密钥存储后端切换（系统钥匙串 / 本地加密文件）：切换即迁移现有密钥
+$('seg-secret-backend').addEventListener('click', async (e) => {
+  const btn = e.target.closest?.('button[data-v]');
+  const v = btn?.dataset.v;
+  if (!v || v === (state.settings?.secret_backend || 'keychain')) return;
+  if (v === 'file' && !confirm('切换到本地加密文件后，密钥将以 AES-256 加密存放在本机配置目录，不再弹钥匙串授权。现在迁移吗？')) return;
+  try {
+    const msg = await invoke('set_secret_backend', { backend: v });
+    await reload();
+    toast(msg || '已切换');
+  } catch (err) {
+    toast(String(err));
+    await reload();
+  }
+});
+
+// 旧版自定义图标无圆角：启动时重画一次（画布 256 + 圆角满铺），只执行一次
+async function migrateCustomIcon() {
+  const s = state.settings;
+  if (!s?.custom_icon || localStorage.getItem('custom-icon-rounded') === '1') return;
+  localStorage.setItem('custom-icon-rounded', '1');
+  try {
+    const img = new Image();
+    await new Promise((ok, no) => { img.onload = ok; img.onerror = no; img.src = s.custom_icon; });
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    const side = Math.min(img.width, img.height);
+    const r = Math.round(256 * 0.227);
+    ctx.beginPath();
+    ctx.moveTo(r, 0);
+    ctx.arcTo(256, 0, 256, 256, r);
+    ctx.arcTo(256, 256, 0, 256, r);
+    ctx.arcTo(0, 256, 0, 0, r);
+    ctx.arcTo(0, 0, 256, 0, r);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 256, 256);
+    await invoke('set_custom_icon', { dataUrl: canvas.toDataURL('image/png') });
+    await reload();
+  } catch (e) {
+    localStorage.removeItem('custom-icon-rounded');
+    console.error('custom icon migrate failed:', e);
+  }
+}
+
 // ─── 更新（侧边 logo 行小按钮 + 关于页手动检查） ──────────────
 let updateUrl = null;
 let updateAsset = null;
@@ -805,6 +855,7 @@ function renderSideLogo() {
     $('config-dir').textContent = await invoke('get_config_dir');
   } catch { /* 忽略 */ }
   await reload();
+  migrateCustomIcon(); // 旧版自定义图标补圆角（一次）
 
   await listen('views-updated', async (e) => {
     // 拖拽进行中跳过重渲染（重建 DOM 会中断 drop）

@@ -53,6 +53,7 @@ fn main() {
             commands::quit_app,
             commands::set_custom_icon,
             commands::set_logo_style,
+            commands::set_secret_backend,
             commands::reset_custom_icon,
             commands::get_config_dir,
             commands::open_external,
