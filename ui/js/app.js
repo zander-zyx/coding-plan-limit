@@ -215,7 +215,7 @@ function renderFormFields() {
     : '阿里云主账号 RAM 密钥（非 DashScope API Key）';
   $('f-baseurl-item').hidden = !t.needs_base_url;
   $('f-baseurl-hint').textContent = t.id === 'zhipu'
-    ? '默认 https://open.bigmodel.cn/api，国际站 https://api.z.ai/api'
+    ? '按站点区域自动填充；如需自定义可手动修改'
     : '必填，例如 https://your-newapi-site.com';
   // Codex 多账号区块（仅 codex 模板；新建套餐须先保存拿到 plan_id 才能绑定）
   const isCodex = t.id === 'codex';
@@ -243,7 +243,7 @@ function renderFormFields() {
   if (editing) {
     $('f-name').value = keepName || editing.plan.name;
     $('f-region').value = editing.plan.region || 'cn';
-    $('f-baseurl').value = keepBaseUrl || editing.plan.base_url || '';
+    $('f-baseurl').value = keepBaseUrl || editing.plan.base_url || regionBaseUrl(t.id, $('f-region').value) || '';
     $('f-threshold').value = keepThreshold || editing.plan.threshold;
     $('f-enabled').checked = editing.plan.enabled;
     const ph = '已配置，留空保持不变';
@@ -255,7 +255,7 @@ function renderFormFields() {
   } else {
     $('f-name').value = state.nameDirty ? keepName : shortLabel(t.id);
     $('f-region').value = 'cn';
-    $('f-baseurl').value = keepBaseUrl;
+    $('f-baseurl').value = keepBaseUrl || regionBaseUrl(t.id, 'cn') || '';
     $('f-threshold').value = keepThreshold || 10;
     $('f-enabled').checked = true;
     ['f-bearer', 'f-cookie', 'f-cookie-key', 'f-ak-id', 'f-ak-secret'].forEach((id) => ($(id).placeholder = ''));
@@ -385,6 +385,22 @@ $('seg-kimi-variant').addEventListener('click', (e) => {
     state.tplVariant = v;
     renderFormFields();
   }
+});
+
+// 模板有明确区域站点的默认 API 地址：选择区域即自动填充，输入框仍可自定义覆盖
+const REGION_BASE_URLS = {
+  zhipu: { cn: 'https://open.bigmodel.cn/api', intl: 'https://api.z.ai/api' },
+};
+
+function regionBaseUrl(tplId, region) {
+  return REGION_BASE_URLS[tplId]?.[region] || null;
+}
+
+$('f-region').addEventListener('change', () => {
+  const t = currentTpl();
+  if (!t?.needs_base_url || !t.has_region) return;
+  const preset = regionBaseUrl(t.id, $('f-region').value);
+  if (preset) $('f-baseurl').value = preset;
 });
 
 $('btn-save').addEventListener('click', async () => {
@@ -694,11 +710,11 @@ $('seg-logo-style').addEventListener('click', async (e) => {
 });
 
 // 密钥存储后端切换（系统钥匙串 / 本地加密文件）：切换即迁移现有密钥
+// 注意：Tauri WebView 不支持 window.confirm，确认步骤不可用，直接执行并以 toast 反馈
 $('seg-secret-backend').addEventListener('click', async (e) => {
   const btn = e.target.closest?.('button[data-v]');
   const v = btn?.dataset.v;
   if (!v || v === (state.settings?.secret_backend || 'keychain')) return;
-  if (v === 'file' && !confirm('切换到本地加密文件后，密钥将以 AES-256 加密存放在本机配置目录，不再弹钥匙串授权。现在迁移吗？')) return;
   try {
     const msg = await invoke('set_secret_backend', { backend: v });
     await reload();

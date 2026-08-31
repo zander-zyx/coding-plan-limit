@@ -634,7 +634,8 @@ input[type='color']:hover { border-color: var(--brand); }
   border-radius: 8px;
   padding: 2px;
 }
-.seg button { padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--text-s); transition: color var(--tr), background var(--tr); }
+.seg button { padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--text-s); background: var(--surface); border: 1px solid var(--hairline); transition: color var(--tr), background var(--tr), border-color var(--tr); }
+.seg button.active { border-color: transparent; }
 .seg button:hover { color: var(--text-p); background: var(--track); }
 .seg button.active { background: var(--brand-aura); color: var(--brand); font-weight: 600; }
 
