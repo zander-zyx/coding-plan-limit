@@ -85,19 +85,23 @@ jobs:
                "Accept": "application/vnd.github+json",
                "User-Agent": "release-notes"}
 
-          def badge(label, color):
+          def badge(label, color, logo=None):
               txt = quote(label.replace("-", "--").replace(" ", "_"))
-              return f"https://img.shields.io/badge/{txt}-{color}.svg"
+              url = f"https://img.shields.io/badge/{txt}-{color}.svg"
+              # emoji 在 SVG 徽章内渲染不可靠，平台图标一律用 simple-icons 矢量 logo
+              if logo:
+                  url += f"?logo={logo}&logoColor=white"
+              return url
 
-          # 文件名后缀 → (分组, 徽章文本, 颜色)；app.tar.gz 为 updater 产物不对用户展示
+          # 文件名后缀 → (分组, 徽章文本, 颜色, 图标)；app.tar.gz 为 updater 产物不对用户展示
           items = {
-              "x64-setup.exe":  ("Windows", "Setup x64", "007ec6"),
-              "x64_en-US.msi":  ("Windows", "MSI x64", "00599c"),
-              "aarch64.dmg":    ("macOS", "\U0001F34E DMG Apple Silicon", "000000"),
-              "x64.dmg":        ("macOS", "\U0001F34E DMG Intel", "007ec6"),
-              "amd64.AppImage": ("Linux", "AppImage x64", "e05d44"),
-              "amd64.deb":      ("Linux", "Deb x64", "d97509"),
-              "x86_64.rpm":     ("Linux", "RPM x64", "f0a030"),
+              "x64-setup.exe":  ("Windows", "Setup x64", "007ec6", "windows"),
+              "x64_en-US.msi":  ("Windows", "MSI x64", "00599c", "windows"),
+              "aarch64.dmg":    ("macOS", "DMG Apple Silicon", "000000", "apple"),
+              "x64.dmg":        ("macOS", "DMG Intel", "007ec6", "apple"),
+              "amd64.AppImage": ("Linux", "AppImage x64", "e05d44", "linux"),
+              "amd64.deb":      ("Linux", "Deb x64", "d97509", "ubuntu"),
+              "x86_64.rpm":     ("Linux", "RPM x64", "f0a030", "linux"),
           }
 
           req = urllib.request.Request(
@@ -105,9 +109,9 @@ jobs:
           rel = json.load(urllib.request.urlopen(req))
           groups = {}
           for a in rel["assets"]:
-              for suf, (osname, label, color) in items.items():
+              for suf, (osname, label, color, logo) in items.items():
                   if a["name"].endswith(suf):
-                      md = f'[![{label}]({badge(label, color)})]({a["browser_download_url"]})'
+                      md = f'[![{label}]({badge(label, color, logo)})]({a["browser_download_url"]})'
                       groups.setdefault(osname, []).append(md)
                       break
 
