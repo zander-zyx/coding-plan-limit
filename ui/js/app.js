@@ -641,11 +641,22 @@ function pickLogoImage() {
       const img = new Image();
       img.onload = async () => {
         const canvas = document.createElement('canvas');
-        canvas.width = 128;
-        canvas.height = 128;
+        canvas.width = 256;
+        canvas.height = 256;
         const ctx = canvas.getContext('2d');
         const side = Math.min(img.width, img.height);
-        ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 128, 128);
+        // 圆角满铺：与内置 Logo 同款样式（圆角比例对齐 Logo Mark 的 22.7%），
+        // 避免 Dock/任务栏里出现直角方块，风格统一
+        const r = Math.round(256 * 0.227);
+        ctx.beginPath();
+        ctx.moveTo(r, 0);
+        ctx.arcTo(256, 0, 256, 256, r);
+        ctx.arcTo(256, 256, 0, 256, r);
+        ctx.arcTo(0, 256, 0, 0, r);
+        ctx.arcTo(0, 0, 256, 0, r);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 256, 256);
         try {
           await invoke('set_custom_icon', { dataUrl: canvas.toDataURL('image/png') });
           await reload();
