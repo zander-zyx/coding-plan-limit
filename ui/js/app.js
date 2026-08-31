@@ -648,6 +648,24 @@ function applyAccentFromSliders() {
 });
 
 // ─── Logo（原色 / Mark / 自定义图片，托盘+标题栏+侧边栏同步） ──
+// macOS 规范网格：1024 画布主体 824（四周 10% 透明边距）、圆角 185/824，
+// 保证自定义图标在 Dock 里与其他应用视觉等大
+function drawRoundedIcon(ctx, img, size) {
+  const side = Math.min(img.width, img.height);
+  const inset = Math.round(size * 0.1);
+  const body = size - inset * 2;
+  const r = Math.round(body * 0.227);
+  ctx.beginPath();
+  ctx.moveTo(inset + r, inset);
+  ctx.arcTo(size - inset, inset, size - inset, size - inset, r);
+  ctx.arcTo(size - inset, size - inset, inset, size - inset, r);
+  ctx.arcTo(inset, size - inset, inset, inset, r);
+  ctx.arcTo(inset, inset, size - inset, inset, r);
+  ctx.closePath();
+  ctx.clip();
+  ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, inset, inset, body, body);
+}
+
 function pickLogoImage() {
   const input = document.createElement('input');
   input.type = 'file';
@@ -663,19 +681,7 @@ function pickLogoImage() {
         canvas.width = 256;
         canvas.height = 256;
         const ctx = canvas.getContext('2d');
-        const side = Math.min(img.width, img.height);
-        // 圆角满铺：与内置 Logo 同款样式（圆角比例对齐 Logo Mark 的 22.7%），
-        // 避免 Dock/任务栏里出现直角方块，风格统一
-        const r = Math.round(256 * 0.227);
-        ctx.beginPath();
-        ctx.moveTo(r, 0);
-        ctx.arcTo(256, 0, 256, 256, r);
-        ctx.arcTo(256, 256, 0, 256, r);
-        ctx.arcTo(0, 256, 0, 0, r);
-        ctx.arcTo(0, 0, 256, 0, r);
-        ctx.closePath();
-        ctx.clip();
-        ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 256, 256);
+        drawRoundedIcon(ctx, img, 256);
         try {
           await invoke('set_custom_icon', { dataUrl: canvas.toDataURL('image/png') });
           await reload();
@@ -725,7 +731,7 @@ $('seg-secret-backend').addEventListener('click', async (e) => {
   }
 });
 
-// 旧版自定义图标无圆角：启动时重画一次（画布 256 + 圆角满铺），只执行一次
+// 旧版自定义图标无圆角/无边距：启动时按规范网格重画一次，只执行一次
 async function migrateCustomIcon() {
   const s = state.settings;
   if (!s?.custom_icon || localStorage.getItem('custom-icon-rounded') === '1') return;
@@ -737,17 +743,7 @@ async function migrateCustomIcon() {
     canvas.width = 256;
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
-    const side = Math.min(img.width, img.height);
-    const r = Math.round(256 * 0.227);
-    ctx.beginPath();
-    ctx.moveTo(r, 0);
-    ctx.arcTo(256, 0, 256, 256, r);
-    ctx.arcTo(256, 256, 0, 256, r);
-    ctx.arcTo(0, 256, 0, 0, r);
-    ctx.arcTo(0, 0, 256, 0, r);
-    ctx.closePath();
-    ctx.clip();
-    ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 256, 256);
+    drawRoundedIcon(ctx, img, 256);
     await invoke('set_custom_icon', { dataUrl: canvas.toDataURL('image/png') });
     await reload();
   } catch (e) {
